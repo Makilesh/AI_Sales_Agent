@@ -11,6 +11,7 @@ AI-powered lead scraper that collects and qualifies leads from Reddit, Discord, 
 ✅ **Dual LLM System**: OpenAI GPT-4-turbo (primary) + Gemini 2.5 Flash (fallback)  
 ✅ **Bulletproof Reliability**: Automatic Gemini fallback when OpenAI quota exceeded  
 ✅ **Advanced Filtering**: 3-stage pre-validation (spam, help phrases, implicit signals)  
+✅ **🎯 Competitor Frustration Detection**: Automatically finds leads dissatisfied with your direct competitors  
 ✅ **Rate Limiting**: Respects platform limits (60/min Reddit, 50/sec Discord, 1/sec Slack)  
 ✅ **Lead Qualification**: AI-powered detection of genuine service inquiries  
 ✅ **Auto-Deduplication**: By URL with intelligent merging  
@@ -110,8 +111,9 @@ optional arguments:
   --sources {reddit,discord,slack,linkedin_public,linkedin_apify} ...
                         Sources to scrape (default: reddit, discord, slack)
                         
-  --service {rwa_reddit,rwa_linkedin,crypto_reddit,crypto_linkedin,ai_reddit,ai_linkedin,blockchain_reddit,blockchain_linkedin,rwa,crypto,ai,blockchain,general,all}
+  --service {rwa_reddit,rwa_linkedin,crypto_reddit,crypto_linkedin,ai_reddit,ai_linkedin,blockchain_reddit,blockchain_linkedin,competitor_frustration_reddit,competitor_frustration_linkedin,rwa,crypto,ai,blockchain,general,all}
                         Service inquiry type. Platform-specific: rwa_reddit, rwa_linkedin, etc.
+                        Competitor frustration: competitor_frustration_reddit/linkedin.
                         Universal: rwa, crypto, ai, blockchain, general, all
                         
   --max-total-leads MAX_TOTAL_LEADS
@@ -143,6 +145,12 @@ optional arguments:
 ## Usage Examples
 
 ```bash
+# 🎯 COMPETITOR FRUSTRATION - Find leads dissatisfied with competitors
+python main.py --sources reddit --service competitor_frustration_reddit --qualify
+
+# Find LinkedIn professionals looking to switch from competitors
+python main.py --sources linkedin_apify --service competitor_frustration_linkedin --qualify --max-total-leads 200
+
 # Scrape Reddit for RWA inquiries with LLM qualification
 python main.py --sources reddit --service rwa_reddit --qualify
 
@@ -170,8 +178,27 @@ python main.py --sources reddit linkedin_apify --service general --qualify --max
 
 ## Available Services
 
+- **🎯 Competitor Frustration**: `competitor_frustration_reddit`, `competitor_frustration_linkedin` - Finds leads dissatisfied with your direct competitors
 - **Platform-specific**: `rwa_reddit`, `rwa_linkedin`, `crypto_reddit`, `crypto_linkedin`, `ai_reddit`, `ai_linkedin`, `blockchain_reddit`, `blockchain_linkedin`
 - **Universal**: `rwa`, `crypto`, `ai`, `blockchain`, `general`, `all`
+
+### Shamla Tech Competitors Tracked
+
+The competitor frustration filter monitors mentions of these India-based Web3/blockchain firms:
+
+**Tier 1 (Direct RWA & Web3 competitors):**
+- Antier Solutions (Mohali) - 700+ people, DeFi, tokenization, wallets
+- Accubits Technologies (Kerala) - Blockchain + AI + RWA platforms
+- Somish Blockchain Labs (Delhi) - DAOs, DeFi, RWA tokenization
+- LeewayHertz (Gurgaon) - Enterprise blockchain & tokenization
+- Primafelicitas (Delhi NCR) - Security tokens, DeFi, RWA
+- SoluLab (Ahmedabad/Mumbai) - Web3, NFT, DeFi, RWA dev
+- IdeaUsher (Mohali) - Web3, RWA, NFT platforms
+- Tech Alchemy (Remote) - RWA builds for startups & enterprises
+- Codezeros (Ahmedabad) - Web3, tokenization, DeFi
+
+**Tier 2 (General blockchain/Web3 companies):**
+- NetSet Software Solutions, Nadcab Labs, Dev Technosys, RedDuck, Quytech, Owebest Technologies, TAKSH IT Solutions
 
 ## LLM Qualification System
 
@@ -205,6 +232,36 @@ Before expensive LLM calls, leads go through 3-stage validation:
    - Requires 2+ signals: budget mentions, struggling, time pressure, etc.
 
 **Result**: Only 5.4% of leads reach LLM (saves $143 per 15k leads)
+
+### 🎯 Competitor Frustration Detection (NEW)
+
+Automatically identifies **high-value leads** who are dissatisfied with your direct competitors. These leads get **+0.2 confidence boost** as they're actively seeking to switch providers.
+
+**How it works:**
+1. **Competitor Detection**: Monitors mentions of 16 India-based Web3/blockchain competitors
+2. **Frustration Signals**: Identifies complaints, delays, pricing issues, quality problems
+3. **Priority Qualification**: Boosts confidence scores for leads seeking alternatives
+
+**Frustration indicators detected:**
+- Cost complaints: "expensive", "overpriced", "too costly"
+- Service issues: "slow", "delayed", "unresponsive", "not working"
+- Quality problems: "disappointed", "frustrated", "issues with"
+- Active switching: "alternative to", "better than", "replace", "switch from"
+
+**Example high-priority leads:**
+- ✅ "Antier Solutions too expensive, need cheaper RWA tokenization alternative" (0.9 confidence)
+- ✅ "LeewayHertz delayed our project 3 months, looking for reliable blockchain consultant" (0.95 confidence)
+- ✅ "Disappointed with Accubits, anyone know better Web3 agency?" (0.85 confidence)
+- ✅ "Alternative to SoluLab? Their tokenization platform not working" (0.9 confidence)
+
+**Usage:**
+```bash
+# Reddit competitor frustration
+python main.py --sources reddit --service competitor_frustration_reddit --qualify
+
+# LinkedIn competitor frustration
+python main.py --sources linkedin_apify --service competitor_frustration_linkedin --qualify --max-total-leads 200
+```
 
 ### Qualification Response
 Each lead receives:
