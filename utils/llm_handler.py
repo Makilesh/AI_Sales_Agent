@@ -69,13 +69,23 @@ You MUST ONLY qualify leads asking for {self.target_service} service specificall
 REJECT leads about other services even if they're high-quality inquiries.
 """
         
-        prompt = f"""You are qualifying sales leads. ONLY qualify if someone is ACTIVELY SEEKING our services.
+        # Competitor detection
+        competitor_context = self._detect_competitor_mentions(full_text)
+        
+        prompt = f"""You are qualifying sales leads for Shamla Tech (India-based Web3/RWA tokenization firm). ONLY qualify if someone is ACTIVELY SEEKING our services.
 
-**OUR SERVICES:**
+**OUR SERVICES (Shamla Tech):**
 - RWA Tokenization: Tokenizing real-world assets on blockchain
 - Crypto/Web3: DeFi, Web3 apps, smart contracts, crypto integration  
 - Blockchain: Custom blockchain, distributed ledger, consensus
 - AI/ML: AI automation, ML models, chatbots, neural networks
+
+**OUR DIRECT COMPETITORS (India-based Web3/Blockchain firms):**
+- Antier Solutions, Accubits Technologies, Somish Blockchain Labs
+- LeewayHertz, Primafelicitas, SoluLab, IdeaUsher, Tech Alchemy, Codezeros
+- NetSet Software, Nadcab Labs, Dev Technosys, RedDuck, Quytech
+
+{competitor_context}
 
 {service_focus}
 
@@ -108,6 +118,16 @@ Example QUALIFIED leads:
 ✓ "Seeking AI automation expert to build chatbot for customer service"
 ✓ "Best service for tokenizing real estate assets?"
 ✓ "Can someone help me find a Web3 developer for our project?"
+
+✅ **PRIORITY LEADS - Competitor Frustration:**
+✓ "Antier Solutions too expensive, need cheaper RWA tokenization alternative"
+✓ "LeewayHertz delayed our project 3 months, looking for reliable blockchain consultant"
+✓ "Disappointed with Accubits, anyone know better Web3 agency?"
+✓ "Alternative to SoluLab? Their tokenization platform not working"
+✓ "Need to replace our current Web3 vendor (Primafelicitas), recommendations?"
+✓ "Switching from Codezeros - too slow, need responsive blockchain developer"
+
+**These get +0.2 confidence boost** as they're actively seeking to change providers!
 
 ⚠️ MODERATE (0.4-0.7) - UNCERTAIN:
 - Asks vague "how to" without clearly seeking service
@@ -147,6 +167,72 @@ Response JSON (no markdown):
 }}"""
         
         return prompt
+    
+    def _detect_competitor_mentions(self, text: str) -> str:
+        """
+        Detect mentions of direct competitors and frustration signals.
+        
+        Returns:
+            str: Context string for LLM about competitor mentions (empty if none)
+        """
+        if not text:
+            return ""
+        
+        text_lower = text.lower()
+        
+        # Shamla Tech competitors
+        competitors = [
+            "antier", "antier solutions",
+            "accubits", "accubits technologies",
+            "somish", "somish blockchain",
+            "leewayhertz", "leeway hertz",
+            "primafelicitas",
+            "solulab",
+            "ideausher",
+            "tech alchemy",
+            "codezeros",
+            "netset", "netset software",
+            "nadcab", "nadcab labs",
+            "dev technosys",
+            "redduck",
+            "quytech",
+            "owebest",
+            "taksh it"
+        ]
+        
+        # Find mentioned competitors
+        mentioned = [comp for comp in competitors if comp in text_lower]
+        
+        if not mentioned:
+            return ""
+        
+        # Check for frustration signals
+        frustration_signals = [
+            "expensive", "overpriced", "too much", "costly",
+            "slow", "delay", "delayed", "late", "unresponsive",
+            "problem", "issue", "trouble", "struggling",
+            "disappointed", "frustrated", "unhappy", "dissatisfied",
+            "not working", "doesn't work", "failed",
+            "alternative to", "better than", "cheaper than",
+            "replace", "switch from", "looking for new",
+            "need new", "change provider", "vendor change"
+        ]
+        
+        has_frustration = any(signal in text_lower for signal in frustration_signals)
+        
+        if has_frustration:
+            competitor_names = ", ".join(mentioned)
+            return f"""🎯 **HIGH-PRIORITY LEAD DETECTED:**
+This lead mentions competitor(s): {competitor_names}
+AND shows frustration/dissatisfaction signals.
+
+**QUALIFICATION BOOST:** Increase confidence by +0.2 if this is a genuine service inquiry.
+They are actively looking for alternatives to their current provider - prime conversion opportunity!
+"""
+        else:
+            # Just mentions competitor without frustration
+            competitor_names = ", ".join(mentioned)
+            return f"ℹ️ Note: Lead mentions competitor: {competitor_names} (no frustration signals detected)"
     
     def _contains_help_seeking_phrase(self, text: str) -> tuple[bool, str]:
         """

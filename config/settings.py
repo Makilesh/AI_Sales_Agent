@@ -127,7 +127,76 @@ class ScrapingConfig:
     # - Mix of announcements, thought leadership, job posts
     # - Returns posts CONTAINING keywords (not necessarily requests)
     
+    # ===================================================================
+    # SHAMLA TECH COMPETITORS (India-based Web3/Blockchain firms)
+    # ===================================================================
+    # Direct competitors in RWA tokenization, DeFi, Web3 development
+    COMPETITORS = [
+        # Tier 1: Direct RWA & Web3 competitors
+        "Antier Solutions", "Accubits Technologies", "Somish Blockchain Labs",
+        "LeewayHertz", "Primafelicitas", "SoluLab", "IdeaUsher",
+        "Tech Alchemy", "Codezeros",
+        
+        # Tier 2: General blockchain/Web3 dev companies
+        "NetSet Software Solutions", "Nadcab Labs", "NADCAB",
+        "Dev Technosys", "RedDuck", "Quytech",
+        "Owebest Technologies", "TAKSH IT Solutions",
+        
+        # Common variations for matching
+        "Antier", "Accubits", "Somish", "Leeway Hertz",
+        "SoluLab", "Codezeros", "NetSet", "Nadcab"
+    ]
+    
     KEYWORD_PRESETS = {
+        # ============================================================
+        # COMPETITOR FRUSTRATION - Find leads dissatisfied with competitors
+        # ============================================================
+        'competitor_frustration_reddit': [
+            # Direct competitor complaints
+            "Antier Solutions problems", "issues with Antier", "Antier delay",
+            "Accubits problems", "Accubits expensive", "issues with Accubits",
+            "LeewayHertz overpriced", "LeewayHertz delay", "LeewayHertz issues",
+            "SoluLab problems", "SoluLab slow", "issues with SoluLab",
+            "Primafelicitas expensive", "Primafelicitas delay",
+            "Somish problems", "IdeaUsher issues", "Codezeros slow",
+            
+            # Alternative seeking (Reddit style)
+            "alternative to Antier", "better than Antier Solutions",
+            "alternative to LeewayHertz", "better than LeewayHertz",
+            "alternative to Accubits", "cheaper than Accubits",
+            "alternative to SoluLab", "better RWA platform than",
+            "alternative to Primafelicitas", "alternative tokenization platform",
+            
+            # Generic frustration with current provider
+            "current Web3 agency problems", "blockchain consultant issues",
+            "RWA platform not working", "tokenization service delay",
+            "Web3 developer unresponsive", "blockchain project stuck",
+            "need new RWA consultant", "switch tokenization provider",
+            "looking to change Web3 agency", "disappointed with current",
+            
+            # Budget/quality complaints
+            "RWA tokenization too expensive", "Web3 agency overcharging",
+            "blockchain consultant overpriced", "tokenization costs too high",
+            "cheaper RWA solution", "affordable tokenization platform",
+            "better value blockchain", "cost-effective Web3",
+        ],
+        
+        'competitor_frustration_linkedin': [
+            # Professional LinkedIn language
+            "seeking alternative to [competitor]",
+            "replacing current Web3 vendor",
+            "RFP tokenization services",
+            "evaluating RWA platforms",
+            "blockchain vendor comparison",
+            "Web3 agency RFP",
+            "tokenization platform evaluation",
+            "dissatisfied with current provider",
+            "seeking better RWA solution",
+            "competitive RWA pricing",
+            "alternative blockchain consultant",
+            "Web3 vendor alternatives",
+        ],
+        
         # ============================================================
         # REDDIT-OPTIMIZED: Short, casual, forum-style
         # ============================================================

@@ -219,10 +219,12 @@ def main():
             'crypto_reddit', 'crypto_linkedin',
             'ai_reddit', 'ai_linkedin',
             'blockchain_reddit', 'blockchain_linkedin',
+            # Competitor frustration presets
+            'competitor_frustration_reddit', 'competitor_frustration_linkedin',
             # Universal presets (work on both platforms)
             'rwa', 'crypto', 'ai', 'blockchain', 'general', 'all'
         ],
-        help='Service inquiry type. Platform-specific: rwa_reddit, rwa_linkedin, etc. Universal: rwa, crypto, ai, blockchain, general, all'
+        help='Service inquiry type. Platform-specific: rwa_reddit, rwa_linkedin, etc. Competitor frustration: competitor_frustration_reddit/linkedin. Universal: rwa, crypto, ai, blockchain, general, all'
     )
     parser.add_argument(
         '--max-total-leads',
