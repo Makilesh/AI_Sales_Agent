@@ -46,3 +46,8 @@ google-generativeai>=0.3.0  # Gemini API fallback
 # Excel Export
 # Used by excel_handler.py for exporting leads to Excel
 openpyxl>=3.1.0
+
+# Web Frontend
+# Flask for web UI
+Flask>=3.0.0
+Flask-CORS>=4.0.0
