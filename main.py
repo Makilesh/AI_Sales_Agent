@@ -304,6 +304,13 @@ def main():
         append_leads(leads, args.output)
         print(f"   ✓ Saved to {args.output} (deduped by URL)")
         
+        # ALWAYS export all leads to Excel (regardless of qualification)
+        timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+        all_leads_excel = f"data/all_leads_{timestamp_str}.xlsx"
+        print(f"\n📊 Exporting all {len(leads)} leads to Excel...")
+        from storage.excel_handler import export_all_leads_to_excel
+        export_all_leads_to_excel(leads, all_leads_excel)
+        
         # LLM qualification (auto or prompt based on settings)
         should_qualify = args.qualify or (settings.openai_api_key and not args.qualify)
         
@@ -346,27 +353,28 @@ def main():
                         qualified_count = len(qualified_leads)
                         qualification_rate = (qualified_count / total_leads * 100) if total_leads > 0 else 0
                         
-                        # Export to Excel with timestamp to avoid permission conflicts
-                        timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        # Export QUALIFIED leads to separate Excel
                         if args.filter_service:
-                            excel_filename = f"data/qualified_leads_{args.filter_service.lower()}_{timestamp_str}.xlsx"
+                            qualified_excel_filename = f"data/qualified_leads_{args.filter_service.lower()}_{timestamp_str}.xlsx"
                         else:
-                            excel_filename = f"data/qualified_leads_{timestamp_str}.xlsx"
-                        print(f"\n📊 Exporting qualified leads to {excel_filename}...")
-                        export_to_excel(list(qualified_leads), list(qualified_quals), excel_filename)
+                            qualified_excel_filename = f"data/qualified_leads_{timestamp_str}.xlsx"
+                        print(f"\n📊 Exporting {qualified_count} qualified leads to Excel...")
+                        export_to_excel(list(qualified_leads), list(qualified_quals), qualified_excel_filename)
                         
                         # Print summary
                         print("\n" + "=" * 60)
                         print("LLM QUALIFICATION SUMMARY")
                         print("=" * 60)
+                        print(f"📄 All leads Excel: {all_leads_excel}")
                         if args.filter_service:
                             print(f"🎯 Service Filter: {args.filter_service}")
                         print(f"✅ {qualified_count}/{total_leads} leads qualified ({qualification_rate:.1f}% qualification rate)")
-                        print(f"📄 Excel export: {excel_filename}")
+                        print(f"📄 Qualified leads Excel: {qualified_excel_filename}")
                     else:
                         print("\n⚠️  No leads were qualified by the LLM")
                         if args.filter_service:
                             print(f"    (No leads found asking for {args.filter_service} services)")
+                        print(f"📄 All scraped leads are still available in: {all_leads_excel}")
                         
                 except Exception as e:
                     print(f"\n⚠️  LLM qualification failed: {e}")
@@ -381,6 +389,11 @@ def main():
         
         print("\n" + "=" * 60)
         print(f"✓ Successfully scraped {len(leads)} leads")
+        print("=" * 60)
+        print(f"📄 JSON: {args.output}")
+        print(f"📊 All Leads Excel: {all_leads_excel}")
+        if should_qualify and 'qualified_excel_filename' in locals():
+            print(f"✅ Qualified Leads Excel: {qualified_excel_filename}")
         print("=" * 60)
         
     except KeyboardInterrupt:

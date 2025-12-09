@@ -214,6 +214,13 @@ async def run_scraping_job(job_id: str, sources: list, keywords: list, max_leads
         append_leads(all_leads, output_file)
         scraping_jobs[job_id]['output_file'] = output_file
         
+        # ALWAYS export all leads to Excel (even without qualification)
+        if all_leads:
+            from storage.excel_handler import export_all_leads_to_excel
+            all_leads_excel = f"data/all_leads_{job_id}.xlsx"
+            export_all_leads_to_excel(all_leads, all_leads_excel)
+            scraping_jobs[job_id]['all_leads_excel'] = all_leads_excel
+        
         # Qualify if requested
         if qualify and all_leads:
             scraping_jobs[job_id]['progress'] = 60
@@ -291,7 +298,11 @@ def download_file(job_id, file_type):
     if file_type == 'json' and 'output_file' in job:
         return send_file(job['output_file'], as_attachment=True)
     elif file_type == 'excel' and 'excel_file' in job:
+        # Qualified leads Excel (only if AI qualification was enabled)
         return send_file(job['excel_file'], as_attachment=True)
+    elif file_type == 'excel_all' and 'all_leads_excel' in job:
+        # All leads Excel (always available)
+        return send_file(job['all_leads_excel'], as_attachment=True)
     else:
         return jsonify({'error': 'File not found'}), 404
 

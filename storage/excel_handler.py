@@ -198,3 +198,91 @@ def export_by_service(
     
     print(f"📊 Exporting {len(service_leads)} {service} leads (confidence >= {min_confidence})...")
     export_to_excel(list(service_leads), list(service_quals), filename)
+
+
+def export_all_leads_to_excel(leads: list[Lead], filename: str) -> None:
+    """
+    Export ALL leads to Excel (including unqualified ones).
+    Useful when you want raw scraped data in Excel format without AI qualification.
+    
+    Args:
+        leads: List of Lead objects
+        filename: Output Excel file path
+    """
+    if not leads:
+        print("⚠️  No leads to export")
+        return
+    
+    # Ensure directory exists
+    Path(filename).parent.mkdir(parents=True, exist_ok=True)
+    
+    # Create workbook and worksheet
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "All Leads"
+    
+    # Define headers (simpler than qualified version)
+    headers = [
+        "Author",
+        "Source", 
+        "Content",
+        "URL",
+        "Engagement Score",
+        "Timestamp"
+    ]
+    
+    # Write headers with formatting
+    header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+    header_font = Font(bold=True, color="FFFFFF")
+    
+    for col_idx, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_idx, value=header)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+    
+    # Sort by engagement score (most engagement first)
+    sorted_leads = sorted(leads, key=lambda x: x.engagement_score or 0, reverse=True)
+    
+    # Write data rows
+    for row_idx, lead in enumerate(sorted_leads, 2):
+        # Truncate content to 300 chars (more space since fewer columns)
+        content = lead.content[:300] + "..." if len(lead.content) > 300 else lead.content
+        
+        # Format timestamp
+        timestamp_str = lead.timestamp.strftime("%Y-%m-%d %H:%M:%S")
+        
+        # Prepare row data
+        row_data = [
+            lead.author,
+            lead.source,
+            content,
+            lead.url,
+            lead.engagement_score or 0,
+            timestamp_str
+        ]
+        
+        # Write row
+        for col_idx, value in enumerate(row_data, 1):
+            cell = ws.cell(row=row_idx, column=col_idx, value=value)
+            cell.alignment = Alignment(vertical="top", wrap_text=(col_idx == 3))  # Wrap text for Content
+    
+    # Auto-adjust column widths
+    for col_idx in range(1, len(headers) + 1):
+        column_letter = get_column_letter(col_idx)
+        if col_idx == 3:  # Content column
+            ws.column_dimensions[column_letter].width = 60
+        elif col_idx == 4:  # URL column
+            ws.column_dimensions[column_letter].width = 50
+        else:
+            ws.column_dimensions[column_letter].width = 20
+    
+    # Freeze header row
+    ws.freeze_panes = "A2"
+    
+    # Save workbook
+    wb.save(filename)
+    
+    print(f"✅ Excel export complete: {filename}")
+    print(f"   • Total leads: {len(leads)}")
+    print(f"   • Sorted by engagement score (highest first)")
