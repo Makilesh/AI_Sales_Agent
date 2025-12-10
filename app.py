@@ -49,9 +49,12 @@ def run_async_in_thread(coro):
 
 
 async def run_scraper(source: str, keywords: list[str]) -> list[Lead]:
-    """Run a single scraper."""
+    """Run a single scraper with timeout and error handling."""
     try:
         if source == 'reddit':
+            if not settings.reddit.client_id or not settings.reddit.client_secret:
+                print(f"⚠️ Reddit credentials not configured")
+                return []
             scraper = RedditScraper(
                 client_id=settings.reddit.client_id,
                 client_secret=settings.reddit.client_secret,
@@ -60,25 +63,32 @@ async def run_scraper(source: str, keywords: list[str]) -> list[Lead]:
                 subreddits=settings.reddit.subreddits,
                 rate_limit=settings.reddit.rate_limit
             )
-            return await scraper.scrape_with_rate_limit()
+            # Add 5-minute timeout per source
+            return await asyncio.wait_for(scraper.scrape_with_rate_limit(), timeout=300)
         
         elif source == 'discord':
+            if not settings.discord.bot_token:
+                print(f"⚠️ Discord bot token not configured")
+                return []
             scraper = DiscordScraper(
                 bot_token=settings.discord.bot_token,
                 keywords=keywords,
                 channel_ids=settings.discord.channels,
                 rate_limit=settings.discord.rate_limit
             )
-            return await scraper.scrape_with_rate_limit()
+            return await asyncio.wait_for(scraper.scrape_with_rate_limit(), timeout=300)
         
         elif source == 'slack':
+            if not settings.slack.bot_token:
+                print(f"⚠️ Slack bot token not configured")
+                return []
             scraper = SlackScraper(
                 bot_token=settings.slack.bot_token,
                 keywords=keywords,
                 channel_ids=settings.slack.channels,
                 rate_limit=settings.slack.rate_limit
             )
-            return await scraper.scrape_with_rate_limit()
+            return await asyncio.wait_for(scraper.scrape_with_rate_limit(), timeout=300)
         
         elif source == 'linkedin_public':
             if settings.linkedin_public.enabled:
@@ -92,6 +102,9 @@ async def run_scraper(source: str, keywords: list[str]) -> list[Lead]:
         
         elif source == 'linkedin_apify':
             if settings.linkedin_apify.enabled:
+                if not settings.linkedin_apify.apify_token:
+                    print(f"⚠️ LinkedIn Apify token not configured")
+                    return []
                 scraper = LinkedInApifyScraper(
                     apify_token=settings.linkedin_apify.apify_token,
                     keywords=keywords,
@@ -102,11 +115,14 @@ async def run_scraper(source: str, keywords: list[str]) -> list[Lead]:
                     proxy_config=settings.linkedin_apify.proxy_config,
                     max_total_leads=settings.scraping.max_total_leads
                 )
-                return await scraper.scrape_with_rate_limit()
+                return await asyncio.wait_for(scraper.scrape_with_rate_limit(), timeout=300)
             return []
         
+    except asyncio.TimeoutError:
+        print(f"⏱️ {source}: Scraping timeout (5 minutes)")
+        return []
     except Exception as e:
-        print(f"Error scraping {source}: {e}")
+        print(f"❌ {source}: Scraping failed - {str(e)}")
         return []
 
 
@@ -213,6 +229,12 @@ async def run_scraping_job(job_id: str, sources: list, keywords: list, max_leads
         output_file = f"data/leads_{job_id}.json"
         append_leads(all_leads, output_file)
         scraping_jobs[job_id]['output_file'] = output_file
+        
+        # ALWAYS export all leads to Excel (even if empty)
+        from storage.excel_handler import export_all_leads_to_excel
+        all_leads_excel = f"data/all_leads_{job_id}.xlsx"
+        export_all_leads_to_excel(all_leads, all_leads_excel)
+        scraping_jobs[job_id]['all_leads_excel'] = all_leads_excel
         
         # Qualify if requested
         if qualify and all_leads:

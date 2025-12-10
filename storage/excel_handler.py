@@ -23,6 +23,32 @@ def export_to_excel(
         qualifications: List of qualification dicts (must match leads order)
         filename: Output Excel file path
     """
+    # Handle empty leads gracefully
+    if not leads or not qualifications:
+        print(f"⚠️  No qualified leads to export")
+        # Create empty workbook with headers
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Qualified Leads"
+        
+        headers = [
+            "Author", "Source", "Content", "URL", "Engagement Score",
+            "Is Qualified", "Confidence", "Reason", "Service Match", "Timestamp"
+        ]
+        
+        header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        header_font = Font(bold=True, color="FFFFFF")
+        
+        for col_idx, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col_idx, value=header)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+        
+        Path(filename).parent.mkdir(parents=True, exist_ok=True)
+        wb.save(filename)
+        return
+    
     if len(leads) != len(qualifications):
         raise ValueError(f"Leads ({len(leads)}) and qualifications ({len(qualifications)}) must have same length")
     
@@ -198,3 +224,107 @@ def export_by_service(
     
     print(f"📊 Exporting {len(service_leads)} {service} leads (confidence >= {min_confidence})...")
     export_to_excel(list(service_leads), list(service_quals), filename)
+
+
+def export_all_leads_to_excel(leads: list[Lead], filename: str) -> None:
+    """
+    Export ALL leads (qualified + unqualified) to Excel.
+    Useful when you want raw scraped data in Excel format without AI qualification.
+    
+    Args:
+        leads: List of Lead objects
+        filename: Output Excel file path
+    """
+    # Handle empty leads gracefully
+    if not leads:
+        print(f"⚠️  No leads to export")
+        # Create empty workbook with headers
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "All Leads"
+        
+        headers = ["Author", "Source", "Content", "URL", "Engagement Score", "Timestamp"]
+        
+        header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+        header_font = Font(bold=True, color="FFFFFF")
+        
+        for col_idx, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col_idx, value=header)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+        
+        Path(filename).parent.mkdir(parents=True, exist_ok=True)
+        wb.save(filename)
+        print(f"✅ Created empty Excel file: {filename}")
+        return
+    
+    # Ensure directory exists
+    Path(filename).parent.mkdir(parents=True, exist_ok=True)
+    
+    # Create workbook and worksheet
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "All Leads"
+    
+    # Define headers (simpler than qualified version)
+    headers = ["Author", "Source", "Content", "URL", "Engagement Score", "Timestamp"]
+    
+    # Write headers with formatting
+    header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+    header_font = Font(bold=True, color="FFFFFF")
+    
+    for col_idx, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_idx, value=header)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+    
+    # Sort by engagement score (most engagement first)
+    sorted_leads = sorted(leads, key=lambda x: x.engagement_score or 0, reverse=True)
+    
+    # Write data rows
+    for row_idx, lead in enumerate(sorted_leads, 2):
+        # Truncate content to 300 chars (more space since fewer columns)
+        content = lead.content[:300] + "..." if len(lead.content) > 300 else lead.content
+        
+        # Format timestamp
+        timestamp_str = lead.timestamp.strftime("%Y-%m-%d %H:%M:%S") if lead.timestamp else ""
+        
+        # Prepare row data
+        row_data = [
+            lead.author,
+            lead.source,
+            content,
+            lead.url,
+            lead.engagement_score or 0,
+            timestamp_str
+        ]
+        
+        # Write row
+        for col_idx, value in enumerate(row_data, 1):
+            cell = ws.cell(row=row_idx, column=col_idx, value=value)
+            cell.alignment = Alignment(vertical="top", wrap_text=(col_idx == 3))  # Wrap text for Content
+    
+    # Auto-adjust column widths
+    column_widths = {
+        1: 20,   # Author
+        2: 12,   # Source
+        3: 60,   # Content
+        4: 50,   # URL
+        5: 18,   # Engagement Score
+        6: 20    # Timestamp
+    }
+    
+    for col_idx, width in column_widths.items():
+        ws.column_dimensions[get_column_letter(col_idx)].width = width
+    
+    # Freeze header row
+    ws.freeze_panes = "A2"
+    
+    # Save workbook
+    wb.save(filename)
+    
+    print(f"✅ Excel export complete: {filename}")
+    print(f"   • Total leads: {len(leads)}")
+    print(f"   • Sorted by engagement score (highest first)")
