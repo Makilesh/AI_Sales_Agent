@@ -218,7 +218,19 @@ class LinkedInApifyScraper(BaseScraper):
         try:
             # Build LinkedIn search URL for the keyword
             import urllib.parse
-            encoded_keyword = urllib.parse.quote(keyword)
+            
+            # For multi-word keywords, try just the most important word
+            # LinkedIn's search works better with simple terms
+            keyword_parts = keyword.split()
+            if len(keyword_parts) > 2:
+                # Use the most distinctive word (usually the last substantive word)
+                simple_keyword = keyword_parts[-1] if keyword_parts[-1] not in ['developer', 'consultant', 'engineer', 'project', 'platform', 'solution'] else keyword_parts[0]
+                print(f"     ℹ️  Simplifying '{keyword}' → '{simple_keyword}' for LinkedIn search")
+                search_term = simple_keyword
+            else:
+                search_term = keyword
+            
+            encoded_keyword = urllib.parse.quote(search_term)
             search_url = f"https://www.linkedin.com/search/results/content/?keywords={encoded_keyword}"
             
             # Detect actor type and configure input accordingly
@@ -231,11 +243,8 @@ class LinkedInApifyScraper(BaseScraper):
             elif 'supreme_coder' in self.actor_id:
                 # supreme_coder/linkedin-post actor
                 run_input = {
-                    'startUrls': [{'url': search_url}],
-                    'maxItems': effective_limit,
-                    'proxyConfiguration': {
-                        'useApifyProxy': True
-                    }
+                    'urls': [search_url],
+                    'limit': effective_limit
                 }
             elif 'curious_coder' in self.actor_id:
                 # curious_coder actor - requires cookies
@@ -270,6 +279,7 @@ class LinkedInApifyScraper(BaseScraper):
                 print(f"        • Using LinkedIn authentication")
             print(f"        • Fetching up to {effective_limit} posts")
             print(f"        • Search URL: {search_url}")
+            print(f"        • Actor input: {run_input}")
             
             # Run Apify actor (blocking call, wrap in thread)
             try:
@@ -306,6 +316,8 @@ class LinkedInApifyScraper(BaseScraper):
                 print(f"        2. Actor configuration issue (check input format)")
                 print(f"        3. LinkedIn rate limiting or blocking")
                 print(f"        4. Apify actor may require authentication")
+                print(f"        5. Try simpler keywords (single words work best)")
+                print(f"     💡 Debug: Check run at https://console.apify.com/actors/runs/{run.get('id', 'unknown')}")
                 return []
             
             # Parse each item
