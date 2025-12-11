@@ -93,7 +93,7 @@ class LinkedInApifyConfig:
     enabled: bool = config("LINKEDIN_APIFY_ENABLED", default=False, cast=bool)
     apify_token: str = config("APIFY_TOKEN", default="")
     actor_id: str = config("LINKEDIN_APIFY_ACTOR", default="apify/linkedin-posts-scraper")
-    max_posts_per_keyword: int = 50
+    max_posts_per_keyword: int = config("LINKEDIN_MAX_POSTS", default=200, cast=int)  # Increase for more results
     rate_limit: int = 10  # Apify API calls per minute
     days_filter: int = config("LINKEDIN_DAYS_FILTER", default=30, cast=int)  # Only posts from last N days
     
@@ -107,6 +107,7 @@ class LinkedInApifyConfig:
     scrape_discussions: bool = True  # Discussion threads
     scrape_comments: bool = True  # Post comments
     scrape_reactions: bool = True  # Like/reaction data
+    min_reactions: int = config("LINKEDIN_MIN_REACTIONS", default=0, cast=int)  # Minimum engagement (0 = all posts)
     
     # Filtering options
     only_posts: bool = True  # Exclude company updates/ads
