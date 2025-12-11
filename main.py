@@ -304,6 +304,13 @@ def main():
         append_leads(leads, args.output)
         print(f"   ✓ Saved to {args.output} (deduped by URL)")
         
+        # ALWAYS export all leads to Excel (regardless of qualification)
+        timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+        all_leads_excel = f"data/all_leads_{timestamp_str}.xlsx"
+        print(f"\n📊 Exporting all {len(leads)} leads to Excel...")
+        from storage.excel_handler import export_all_leads_to_excel
+        export_all_leads_to_excel(leads, all_leads_excel)
+        
         # LLM qualification (auto or prompt based on settings)
         should_qualify = args.qualify or (settings.openai_api_key and not args.qualify)
         
@@ -359,14 +366,16 @@ def main():
                         print("\n" + "=" * 60)
                         print("LLM QUALIFICATION SUMMARY")
                         print("=" * 60)
+                        print(f"📄 All leads Excel: {all_leads_excel}")
                         if args.filter_service:
                             print(f"🎯 Service Filter: {args.filter_service}")
                         print(f"✅ {qualified_count}/{total_leads} leads qualified ({qualification_rate:.1f}% qualification rate)")
-                        print(f"📄 Excel export: {excel_filename}")
+                        print(f"📄 Qualified leads Excel: {excel_filename}")
                     else:
                         print("\n⚠️  No leads were qualified by the LLM")
                         if args.filter_service:
                             print(f"    (No leads found asking for {args.filter_service} services)")
+                        print(f"📄 All scraped leads are still available in: {all_leads_excel}")
                         
                 except Exception as e:
                     print(f"\n⚠️  LLM qualification failed: {e}")

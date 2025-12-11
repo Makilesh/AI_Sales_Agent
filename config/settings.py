@@ -92,7 +92,7 @@ class LinkedInApifyConfig:
     """LinkedIn scraping via Apify API (production-ready, no account risk)."""
     enabled: bool = config("LINKEDIN_APIFY_ENABLED", default=False, cast=bool)
     apify_token: str = config("APIFY_TOKEN", default="")
-    actor_id: str = config("LINKEDIN_APIFY_ACTOR", default="supreme_coder/linkedin-post")
+    actor_id: str = config("LINKEDIN_APIFY_ACTOR", default="apify/linkedin-posts-scraper")
     max_posts_per_keyword: int = 50
     rate_limit: int = 10  # Apify API calls per minute
     

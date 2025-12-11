@@ -222,20 +222,25 @@ class LinkedInApifyScraper(BaseScraper):
             search_url = f"https://www.linkedin.com/search/results/content/?keywords={encoded_keyword}"
             
             # Detect actor type and configure input accordingly
-            if 'supreme_coder/linkedin-post' in self.actor_id:
-                # supreme_coder/linkedin-post actor - simple input, no cookies
+            if 'apify/linkedin-posts-scraper' in self.actor_id:
+                # apify/linkedin-posts-scraper (RECOMMENDED - most reliable)
                 run_input = {
-                    'urls': [search_url],
-                    'limit': effective_limit
+                    'startUrls': [{'url': search_url}],
+                    'resultsLimit': effective_limit
                 }
-            elif 'apify/linkedin-posts-scraper' in self.actor_id:
-                # apify/linkedin-posts-scraper - different input format
+            elif 'supreme_coder' in self.actor_id:
+                # supreme_coder/linkedin-post actor
                 run_input = {
-                    'searchUrls': [search_url],
-                    'maxPosts': effective_limit
+                    'startUrls': [{'url': search_url}],
+                    'maxItems': effective_limit,
+                    'proxyConfiguration': {
+                        'useApifyProxy': True
+                    }
                 }
             elif 'curious_coder' in self.actor_id:
                 # curious_coder actor - requires cookies
+                if not self.linkedin_cookie:
+                    print(f"     ⚠️  Warning: curious_coder actor requires LinkedIn cookie (li_at)")
                 run_input = {
                     'urls': [search_url],
                     'maxPosts': effective_limit,
@@ -243,7 +248,7 @@ class LinkedInApifyScraper(BaseScraper):
                         'name': 'li_at',
                         'value': self.linkedin_cookie,
                         'domain': '.linkedin.com'
-                    }],
+                    }] if self.linkedin_cookie else [],
                     'userAgent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                     'proxy': {
                         'useApifyProxy': True
@@ -252,10 +257,10 @@ class LinkedInApifyScraper(BaseScraper):
                     }
                 }
             else:
-                # Generic actor
+                # Generic fallback
                 run_input = {
-                    'urls': [search_url],
-                    'maxResults': effective_limit
+                    'startUrls': [{'url': search_url}],
+                    'maxItems': effective_limit
                 }
             
             print(f"     → Running Apify actor ({self.actor_id})...")
@@ -264,15 +269,22 @@ class LinkedInApifyScraper(BaseScraper):
             else:
                 print(f"        • Using LinkedIn authentication")
             print(f"        • Fetching up to {effective_limit} posts")
+            print(f"        • Search URL: {search_url}")
             
             # Run Apify actor (blocking call, wrap in thread)
-            run = await asyncio.to_thread(
-                self.client.actor(self.actor_id).call,
-                run_input=run_input
-            )
+            try:
+                run = await asyncio.to_thread(
+                    self.client.actor(self.actor_id).call,
+                    run_input=run_input
+                )
+                print(f"     → Actor run completed: {run.get('status', 'unknown')}")
+            except Exception as actor_error:
+                print(f"     ❌ Actor execution failed: {actor_error}")
+                print(f"        Tip: Check if actor '{self.actor_id}' exists at https://console.apify.com/")
+                raise
             
             # Fetch results from dataset
-            print(f"     → Fetching results from dataset...")
+            print(f"     → Fetching results from dataset ({run.get('defaultDatasetId', 'unknown')})...")
             dataset_items = await asyncio.to_thread(
                 self.client.dataset(run['defaultDatasetId']).list_items
             )
@@ -286,6 +298,15 @@ class LinkedInApifyScraper(BaseScraper):
                 items = dataset_items
             
             print(f"     → Found {len(items)} raw items from Apify")
+            
+            if len(items) == 0:
+                print(f"     ⚠️  No items returned from Apify actor")
+                print(f"        Possible reasons:")
+                print(f"        1. Keyword '{keyword}' has no matching LinkedIn posts")
+                print(f"        2. Actor configuration issue (check input format)")
+                print(f"        3. LinkedIn rate limiting or blocking")
+                print(f"        4. Apify actor may require authentication")
+                return []
             
             # Parse each item
             for item in items:
