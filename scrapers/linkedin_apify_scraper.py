@@ -139,6 +139,67 @@ class LinkedInApifyScraper(BaseScraper):
         
         return True
     
+    def _is_service_inquiry(self, text: str) -> bool:
+        """
+        STRICT filter: Only pass genuine buyer inquiries asking for help/services.
+        Block: news, education, promotion, job posts, thought leadership, announcements.
+        """
+        if not text:
+            return False
+        
+        text_lower = text.lower()
+        
+        # STRICT: Must have explicit help-seeking/buying phrases
+        inquiry_phrases = [
+            "looking for", "need help", "need a", "need to hire", "seeking",
+            "anyone know", "recommendations for", "suggestions for",
+            "can anyone recommend", "who can help", "looking to hire",
+            "need advice", "need assistance", "help with", "help me",
+            "struggling with", "having trouble", "can't figure out",
+            "budget for", "willing to pay", "price range", "cost estimate",
+            "rfp for", "request for proposal", "quotes for", "quotation for",
+            "vendor for", "service provider", "consultant needed",
+            "contractor needed", "freelancer needed"
+        ]
+        
+        has_inquiry = any(phrase in text_lower for phrase in inquiry_phrases)
+        if not has_inquiry:
+            return False
+        
+        # STRICT blockers - reject educational/news/promotional content
+        content_blockers = [
+            # Promotional/company announcements
+            "proud to announce", "excited to share", "thrilled to announce",
+            "we are pleased", "we're launching", "join us", "register now",
+            "check out our", "our platform", "our solution", "we provide",
+            "we offer", "our team", "our company", "partnership with",
+            "signed a deal", "collaborated with", "working with",
+            
+            # Educational/thought leadership (these dominate LinkedIn)
+            "imagine owning", "the future of", "is changing the way",
+            "is reshaping", "is transforming", "is redefining",
+            "will become", "is emerging as", "key trends",
+            "deep dive into", "just published", "my article",
+            "reflections from", "what's next for", "the next frontier",
+            "a convergence", "aligns with", "roadmap", "framework",
+            
+            # News/announcements
+            "acquired", "acquisition", "announced", "authorization",
+            "last week", "yesterday", "just over", "has officially",
+            "blackrock", "securitize", "kraken", "coinbase",
+            
+            # Job postings (hiring, not seeking service)
+            "we are hiring", "we're hiring", "job opening",
+            "position:", "location:", "duration:", "job description",
+            "send resumes to", "apply now", "submit your resume",
+            "candidates / vendors", "years experience", "yrs exp"
+        ]
+        
+        if any(blocker in text_lower for blocker in content_blockers):
+            return False
+        
+        return True
+    
     def _classify_service_type(self, text: str) -> list[str]:
         """
         Classify lead by service category (RWA, Crypto, AI, etc.).
@@ -188,16 +249,21 @@ class LinkedInApifyScraper(BaseScraper):
                 print(f"\n  [{idx}/{len(self.keywords)}] Keyword: '{keyword}' (budget: {posts_to_fetch} posts)")
                 leads = await self._scrape_keyword(keyword, posts_to_fetch)
                 
-                # Add service classification and filter duplicates
+                # Filter for service inquiries and add classification
                 unique_leads = []
                 for lead in leads:
                     if lead.url not in seen_urls:
-                        service_types = self._classify_service_type(lead.content + " " + (lead.title or ""))
-                        lead.metadata['service_types'] = service_types
-                        lead.metadata['service_inquiry'] = True
+                        # Check if it's actually a service inquiry
+                        full_text = lead.content + " " + (lead.title or "")
+                        is_inquiry = self._is_service_inquiry(full_text)
                         
-                        unique_leads.append(lead)
-                        seen_urls.add(lead.url)
+                        if is_inquiry:
+                            service_types = self._classify_service_type(full_text)
+                            lead.metadata['service_types'] = service_types
+                            lead.metadata['service_inquiry'] = True
+                            
+                            unique_leads.append(lead)
+                            seen_urls.add(lead.url)
                 
                 all_leads.extend(unique_leads)
                 duplicates = len(leads) - len(unique_leads)
