@@ -113,7 +113,8 @@ async def run_scraper(source: str, keywords: list[str]) -> list[Lead]:
                     actor_id=settings.linkedin_apify.actor_id,
                     linkedin_cookie=settings.linkedin_apify.linkedin_cookie,
                     proxy_config=settings.linkedin_apify.proxy_config,
-                    max_total_leads=settings.scraping.max_total_leads
+                    max_total_leads=settings.scraping.max_total_leads,
+                    days_filter=settings.linkedin_apify.days_filter
                 )
                 return await asyncio.wait_for(scraper.scrape_with_rate_limit(), timeout=300)
             return []
@@ -167,6 +168,7 @@ def start_scrape():
     max_leads = data.get('max_leads', 200)
     qualify = data.get('qualify', False)
     filter_service = data.get('filter_service', None)
+    days_filter = data.get('days_filter', 30)  # Date filter for LinkedIn
     
     if not sources:
         return jsonify({'error': 'No sources selected'}), 400
@@ -190,6 +192,7 @@ def start_scrape():
         'max_leads': max_leads,
         'qualify': qualify,
         'filter_service': filter_service,
+        'days_filter': days_filter,
         'started_at': datetime.now().isoformat(),
         'progress': 0,
         'leads_found': 0,
@@ -197,7 +200,7 @@ def start_scrape():
     }
     
     # Run scraping in background
-    run_async_in_thread(run_scraping_job(job_id, sources, keywords, max_leads, qualify, filter_service))
+    run_async_in_thread(run_scraping_job(job_id, sources, keywords, max_leads, qualify, filter_service, days_filter))
     
     return jsonify({
         'job_id': job_id,
@@ -206,11 +209,12 @@ def start_scrape():
     })
 
 
-async def run_scraping_job(job_id: str, sources: list, keywords: list, max_leads: int, qualify: bool, filter_service: str):
+async def run_scraping_job(job_id: str, sources: list, keywords: list, max_leads: int, qualify: bool, filter_service: str, days_filter: int = 30):
     """Run scraping job in background."""
     try:
-        # Update max leads
+        # Update max leads and days filter
         settings.scraping.max_total_leads = max_leads
+        settings.linkedin_apify.days_filter = days_filter
         
         # Run scrapers concurrently
         tasks = [run_scraper(source, keywords) for source in sources]

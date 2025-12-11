@@ -567,6 +567,20 @@
                         <div class="help-text">Global limit across all sources</div>
                     </div>
 
+                    <!-- Days Filter (LinkedIn) -->
+                    <div class="form-group">
+                        <label for="daysFilter">📅 LinkedIn Date Filter</label>
+                        <select id="daysFilter" name="days_filter">
+                            <option value="7">Last 7 days</option>
+                            <option value="15">Last 15 days</option>
+                            <option value="30" selected>Last 30 days</option>
+                            <option value="60">Last 60 days</option>
+                            <option value="90">Last 90 days</option>
+                            <option value="0">All time (no filter)</option>
+                        </select>
+                        <div class="help-text">Only show LinkedIn posts from selected time period</div>
+                    </div>
+
                     <!-- LLM Qualification -->
                     <div class="form-group">
                         <label>🤖 LLM Qualification</label>
@@ -786,6 +800,7 @@
             const maxLeads = parseInt(document.getElementById('maxLeads').value);
             const qualify = document.getElementById('qualify').checked;
             const filterService = document.getElementById('filterService').value;
+            const daysFilter = parseInt(document.getElementById('daysFilter').value);
 
             // Prepare request data
             const requestData = {
@@ -793,6 +808,7 @@
                 service_preset: servicePreset || null,
                 custom_keywords: customKeywords,
                 max_leads: maxLeads,
+                days_filter: daysFilter,
                 qualify,
                 filter_service: filterService || null
             };

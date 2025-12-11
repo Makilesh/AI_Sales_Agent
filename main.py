@@ -141,7 +141,8 @@ async def scrape_linkedin_apify() -> list[Lead]:
             only_posts=settings.linkedin_apify.only_posts,
             include_sponsored=settings.linkedin_apify.include_sponsored,
             min_reactions=settings.linkedin_apify.min_reactions,
-            max_total_leads=settings.scraping.max_total_leads  # Pass global limit
+            max_total_leads=settings.scraping.max_total_leads,  # Pass global limit
+            days_filter=settings.linkedin_apify.days_filter  # Date filter
         )
         leads = await scraper.scrape_with_rate_limit()
         print(f"✓ LinkedIn Apify: Found {len(leads)} leads")

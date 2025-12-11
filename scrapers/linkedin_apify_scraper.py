@@ -70,7 +70,8 @@ class LinkedInApifyScraper(BaseScraper):
         only_posts: bool = True,
         include_sponsored: bool = False,
         min_reactions: int = 0,
-        max_total_leads: int = 200  # Global limit across all keywords
+        max_total_leads: int = 200,  # Global limit across all keywords
+        days_filter: int = 30  # Only include posts from last N days (0 = no filter)
     ) -> None:
         """
         Initialize LinkedIn Apify scraper for SERVICE LEAD discovery.
@@ -92,12 +93,14 @@ class LinkedInApifyScraper(BaseScraper):
             include_sponsored: Include sponsored content
             min_reactions: Minimum reactions to consider
             max_total_leads: Global limit - stop scraping after this many total leads
+            days_filter: Only include posts from last N days (0 = no filter, default: 30)
         """
         super().__init__(keywords, rate_limit)
         self.apify_token = apify_token
         self.max_posts_per_keyword = max_posts_per_keyword
         self.max_total_leads = max_total_leads
         self.actor_id = actor_id
+        self.days_filter = days_filter
         self.linkedin_cookie = linkedin_cookie
         self.proxy_config = proxy_config
         self.scrape_posts = scrape_posts
@@ -321,6 +324,7 @@ class LinkedInApifyScraper(BaseScraper):
                 return []
             
             # Parse each item
+            filtered_by_date = 0
             for item in items:
                 try:
                     # Filter by content type
@@ -332,6 +336,30 @@ class LinkedInApifyScraper(BaseScraper):
                         continue
                     if item_type in ['discussion', 'thread'] and not self.scrape_discussions:
                         continue
+                    
+                    # Filter by date (if days_filter is set)
+                    if self.days_filter > 0:
+                        post_date = item.get('postedAt') or item.get('date') or item.get('createdAt')
+                        if post_date:
+                            try:
+                                from datetime import timedelta
+                                # Try parsing different date formats
+                                if isinstance(post_date, str):
+                                    # Parse ISO format or timestamp
+                                    if 'T' in post_date:
+                                        post_datetime = datetime.fromisoformat(post_date.replace('Z', '+00:00'))
+                                    else:
+                                        post_datetime = datetime.strptime(post_date, '%Y-%m-%d')
+                                else:
+                                    post_datetime = datetime.fromtimestamp(post_date)
+                                
+                                cutoff_date = datetime.now() - timedelta(days=self.days_filter)
+                                if post_datetime < cutoff_date:
+                                    filtered_by_date += 1
+                                    continue
+                            except Exception as date_error:
+                                # If date parsing fails, include the post (don't filter out)
+                                pass
                     
                     # Filter by reaction count
                     reactions_total = item.get('reactions', {}).get('total', 0) if isinstance(item.get('reactions'), dict) else 0
@@ -346,6 +374,10 @@ class LinkedInApifyScraper(BaseScraper):
                         leads.append(lead)
                 except Exception as e:
                     continue
+            
+            # Show date filtering stats
+            if filtered_by_date > 0:
+                print(f"     🗓️  Filtered out {filtered_by_date} posts older than {self.days_filter} days")
         
         except Exception as e:
             print(f"     ⚠️  Apify API error: {e}")

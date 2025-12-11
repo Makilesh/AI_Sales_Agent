@@ -95,6 +95,7 @@ class LinkedInApifyConfig:
     actor_id: str = config("LINKEDIN_APIFY_ACTOR", default="apify/linkedin-posts-scraper")
     max_posts_per_keyword: int = 50
     rate_limit: int = 10  # Apify API calls per minute
+    days_filter: int = config("LINKEDIN_DAYS_FILTER", default=30, cast=int)  # Only posts from last N days
     
     # LinkedIn authentication (required by some actors)
     linkedin_cookie: str = config("LINKEDIN_COOKIE", default="")  # li_at cookie value
