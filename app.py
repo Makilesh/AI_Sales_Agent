@@ -212,9 +212,10 @@ def start_scrape():
 async def run_scraping_job(job_id: str, sources: list, keywords: list, max_leads: int, qualify: bool, filter_service: str, days_filter: int = 30):
     """Run scraping job in background."""
     try:
-        # Update max leads and days filter
+        # Update max leads and days filter (universal for all sources)
         settings.scraping.max_total_leads = max_leads
-        settings.linkedin_apify.days_filter = days_filter
+        settings.scraping.days_filter = days_filter  # Universal days filter
+        settings.linkedin_apify.days_filter = days_filter  # LinkedIn-specific (kept for backward compat)
         
         # Run scrapers concurrently
         tasks = [run_scraper(source, keywords) for source in sources]

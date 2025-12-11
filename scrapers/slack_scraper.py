@@ -18,9 +18,10 @@ class SlackScraper(BaseScraper):
         bot_token: str,
         keywords: list[str],
         channel_ids: list[str],
-        rate_limit: int = 1
+        rate_limit: int = 1,
+        days_filter: int = 30
     ) -> None:
-        super().__init__(keywords, rate_limit)
+        super().__init__(keywords, rate_limit, days_filter)
         self.bot_token = bot_token
         self.channel_ids = channel_ids
         
@@ -155,6 +156,10 @@ class SlackScraper(BaseScraper):
             # Convert timestamp to datetime
             ts = float(message.get('ts', 0))
             timestamp = datetime.fromtimestamp(ts)
+            
+            # Check date filter
+            if not self._is_within_date_range(timestamp):
+                return None
             
             # Build message URL
             team_id = message.get('team')

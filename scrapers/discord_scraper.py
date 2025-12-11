@@ -18,9 +18,10 @@ class DiscordScraper(BaseScraper):
         bot_token: str,
         keywords: list[str],
         channel_ids: list[str],
-        rate_limit: int = 50
+        rate_limit: int = 50,
+        days_filter: int = 30
     ) -> None:
-        super().__init__(keywords, rate_limit)
+        super().__init__(keywords, rate_limit, days_filter)
         self.bot_token = bot_token
         self.channel_ids = [int(cid) for cid in channel_ids if cid]
         self.client: discord.Client | None = None
@@ -145,6 +146,10 @@ class DiscordScraper(BaseScraper):
         """Create a Lead object from a Discord message."""
         try:
             if not message.content or message.author.bot:
+                return None
+            
+            # Check date filter
+            if not self._is_within_date_range(message.created_at):
                 return None
             
             # Get server and channel names

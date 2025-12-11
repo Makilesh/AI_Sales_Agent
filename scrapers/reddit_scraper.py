@@ -19,9 +19,10 @@ class RedditScraper(BaseScraper):
         user_agent: str,
         keywords: list[str],
         subreddits: list[str],
-        rate_limit: int = 100
+        rate_limit: int = 100,
+        days_filter: int = 30
     ) -> None:
-        super().__init__(keywords, rate_limit)
+        super().__init__(keywords, rate_limit, days_filter)
         self.subreddits = subreddits
         self.skip_keyword_filter = True  # Reddit uses help-seeking subreddits, bypass keyword filter
         
@@ -206,13 +207,18 @@ class RedditScraper(BaseScraper):
     def _create_lead_from_post(self, submission: Submission, subreddit_name: str) -> Lead | None:
         """Create a Lead object from a Reddit post."""
         try:
+            # Check date filter
+            post_date = datetime.fromtimestamp(submission.created_utc)
+            if not self._is_within_date_range(post_date):
+                return None
+            
             content = f"{submission.title}\n\n{submission.selftext}" if submission.selftext else submission.title
             
             return Lead(
                 source='reddit',
                 author=str(submission.author) if submission.author else '[deleted]',
                 content=content,
-                timestamp=datetime.fromtimestamp(submission.created_utc),
+                timestamp=post_date,
                 url=f"https://reddit.com{submission.permalink}",
                 title=submission.title,
                 engagement_score=submission.score,
@@ -239,11 +245,16 @@ class RedditScraper(BaseScraper):
             if not comment.body or comment.body in ['[deleted]', '[removed]']:
                 return None
             
+            # Check date filter
+            comment_date = datetime.fromtimestamp(comment.created_utc)
+            if not self._is_within_date_range(comment_date):
+                return None
+            
             return Lead(
                 source='reddit',
                 author=str(comment.author) if comment.author else '[deleted]',
                 content=comment.body,
-                timestamp=datetime.fromtimestamp(comment.created_utc),
+                timestamp=comment_date,
                 url=f"https://reddit.com{comment.permalink}",
                 title=submission.title,
                 engagement_score=comment.score,

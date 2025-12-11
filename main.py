@@ -33,7 +33,8 @@ async def scrape_reddit() -> list[Lead]:
             user_agent=settings.reddit.user_agent,
             keywords=settings.scraping.keywords,
             subreddits=settings.reddit.subreddits,
-            rate_limit=settings.reddit.rate_limit
+            rate_limit=settings.reddit.rate_limit,
+            days_filter=settings.scraping.days_filter
         )
         leads = await scraper.scrape_with_rate_limit()
         print(f"✓ Reddit: Found {len(leads)} leads")
@@ -51,7 +52,8 @@ async def scrape_discord() -> list[Lead]:
             bot_token=settings.discord.bot_token,
             keywords=settings.scraping.keywords,
             channel_ids=settings.discord.channels,
-            rate_limit=settings.discord.rate_limit
+            rate_limit=settings.discord.rate_limit,
+            days_filter=settings.scraping.days_filter
         )
         leads = await scraper.scrape_with_rate_limit()
         print(f"✓ Discord: Found {len(leads)} leads")
@@ -69,7 +71,8 @@ async def scrape_slack() -> list[Lead]:
             bot_token=settings.slack.bot_token,
             keywords=settings.scraping.keywords,
             channel_ids=settings.slack.channels,
-            rate_limit=settings.slack.rate_limit
+            rate_limit=settings.slack.rate_limit,
+            days_filter=settings.scraping.days_filter
         )
         leads = await scraper.scrape_with_rate_limit()
         print(f"✓ Slack: Found {len(leads)} leads")
