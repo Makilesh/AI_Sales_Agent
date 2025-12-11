@@ -574,10 +574,14 @@
                             <option value="7">Last 7 days</option>
                             <option value="15">Last 15 days</option>
                             <option value="30" selected>Last 30 days</option>
+                            <option value="45">Last 45 days</option>
                             <option value="60">Last 60 days</option>
                             <option value="90">Last 90 days</option>
+                            <option value="custom">Custom days...</option>
                             <option value="0">All time (no filter)</option>
                         </select>
+                        <input type="number" id="customDays" name="custom_days" placeholder="Enter days" 
+                               style="display: none; margin-top: 8px;" min="1" max="365">
                         <div class="help-text">Filter content from all sources by date (Reddit, LinkedIn, Discord, Slack)</div>
                     </div>
 
@@ -778,6 +782,17 @@
             document.getElementById('filterServiceGroup').style.display = this.checked ? 'block' : 'none';
         });
 
+        // Show/hide custom days input
+        document.getElementById('daysFilter').addEventListener('change', function() {
+            const customInput = document.getElementById('customDays');
+            if (this.value === 'custom') {
+                customInput.style.display = 'block';
+                customInput.focus();
+            } else {
+                customInput.style.display = 'none';
+            }
+        });
+
         // Form submission
         document.getElementById('scrapeForm').addEventListener('submit', async function(e) {
             e.preventDefault();
@@ -800,7 +815,15 @@
             const maxLeads = parseInt(document.getElementById('maxLeads').value);
             const qualify = document.getElementById('qualify').checked;
             const filterService = document.getElementById('filterService').value;
-            const daysFilter = parseInt(document.getElementById('daysFilter').value);
+            
+            // Handle days filter (custom or preset)
+            let daysFilter;
+            const daysFilterSelect = document.getElementById('daysFilter').value;
+            if (daysFilterSelect === 'custom') {
+                daysFilter = parseInt(document.getElementById('customDays').value) || 30;
+            } else {
+                daysFilter = parseInt(daysFilterSelect);
+            }
 
             // Prepare request data
             const requestData = {
