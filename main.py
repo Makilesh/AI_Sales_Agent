@@ -11,7 +11,7 @@ from scrapers.reddit_scraper import RedditScraper
 from scrapers.discord_scraper import DiscordScraper
 from scrapers.slack_scraper import SlackScraper
 from scrapers.linkedin_public_scraper import LinkedInPublicScraper
-from scrapers.linkedin_apify_scraper import LinkedInApifyScraper
+from scrapers.linkedin_public_scraper import LinkedInPublicScraper
 from storage.json_handler import append_leads, save_leads
 from storage.excel_handler import export_to_excel
 from utils.linkedin_helpers import get_linkedin_user_agents
@@ -117,11 +117,31 @@ async def scrape_linkedin_public() -> list[Lead]:
         return []
 
 
-async def scrape_linkedin_apify() -> list[Lead]:
-    """Scrape LinkedIn for people explicitly ASKING for our services (consultants, solutions, platforms)."""
+async def scrape_linkedin_public() -> list[Lead]:
+    """Scrape LinkedIn using free public scraper (no authentication required)."""
     if not settings.linkedin_apify.enabled:
         return []
     
+    print("\n=== Starting LinkedIn Public Scraping ===")
+    try:
+        scraper = LinkedInPublicScraper(
+            keywords=settings.scraping.keywords,
+            max_posts_per_keyword=settings.linkedin_apify.max_posts_per_keyword,
+            max_total_leads=settings.scraping.max_total_leads,
+            days_filter=settings.linkedin_apify.days_filter,
+            min_reactions=settings.linkedin_apify.min_reactions,
+            rate_limit=2  # 2 seconds between requests
+        )
+        leads = await scraper.scrape_with_rate_limit()
+        print(f"✓ LinkedIn Public scraping complete: {len(leads)} leads found")
+        return leads
+    except Exception as e:
+        print(f"❌ LinkedIn Public scraping failed: {e}")
+        return []
+
+
+async def scrape_linkedin_apify() -> list[Lead]:
+    """Scrape LinkedIn using Apify API (paid service)"""
     if not settings.linkedin_apify.apify_token:
         print("LinkedIn Apify: Token not configured, skipping")
         return []
@@ -144,8 +164,8 @@ async def scrape_linkedin_apify() -> list[Lead]:
             only_posts=settings.linkedin_apify.only_posts,
             include_sponsored=settings.linkedin_apify.include_sponsored,
             min_reactions=settings.linkedin_apify.min_reactions,
-            max_total_leads=settings.scraping.max_total_leads,  # Pass global limit
-            days_filter=settings.linkedin_apify.days_filter  # Date filter
+            max_total_leads=settings.scraping.max_total_leads,
+            days_filter=settings.linkedin_apify.days_filter
         )
         leads = await scraper.scrape_with_rate_limit()
         print(f"✓ LinkedIn Apify: Found {len(leads)} leads")
@@ -168,10 +188,10 @@ async def run_scrapers(sources: list[str]) -> list[Lead]:
     if 'slack' in sources:
         tasks.append(scrape_slack())
     
-    if 'linkedin_public' in sources and settings.linkedin_public.enabled:
+    if 'linkedin_public' in sources or 'linkedin' in sources:
         tasks.append(scrape_linkedin_public())
     
-    if 'linkedin_apify' in sources and settings.linkedin_apify.enabled:
+    if 'linkedin_apify' in sources:
         tasks.append(scrape_linkedin_apify())
     
     if not tasks:
@@ -210,9 +230,9 @@ def main():
     parser.add_argument(
         '--sources',
         nargs='+',
-        choices=['reddit', 'discord', 'slack', 'linkedin_public', 'linkedin_apify'],
+        choices=['reddit', 'discord', 'slack', 'linkedin', 'linkedin_public', 'linkedin_apify'],
         default=['reddit', 'discord', 'slack'],
-        help='Sources to scrape (default: reddit, discord, slack)'
+        help='Sources to scrape (linkedin=free public, linkedin_public=free, linkedin_apify=paid)'
     )
     parser.add_argument(
         '--service',
