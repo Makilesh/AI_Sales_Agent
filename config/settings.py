@@ -526,7 +526,7 @@ class ScrapingConfig:
     
     max_results_per_source: int = 100
     max_total_leads: int = 200  # Global limit - stops scraping after this many total leads
-    days_filter: int = config("DAYS_FILTER", default=2, cast=int)  # Universal date filter for all sources (0 = no filter)
+    days_filter: int = config("DAYS_FILTER", default=7, cast=int)  # Universal date filter for all sources (0 = no filter)
     scrape_interval_seconds: int = 300  # 5 minutes
     enable_sentiment_filter: bool = True
     min_engagement_score: int = 0  # minimum upvotes/reactions (0 = allow posts with no engagement)
