@@ -16,7 +16,7 @@ from scrapers.linkedin_sl_scraper import LinkedInSeleniumScraper
 from storage.json_handler import append_leads, save_leads
 from storage.excel_handler import export_to_excel
 from utils.linkedin_helpers import get_linkedin_user_agents
-from utils.llm_handler import qualify_leads_concurrent
+from utils.llm_handler import qualify_leads_concurrent, qualify_leads_in_batches
 
 
 # Module-level counter for LinkedIn public scraper daily limit
@@ -380,6 +380,24 @@ def main():
         help='LLM filter: ONLY qualify leads asking for specific service (RWA, Crypto, AI/ML, Blockchain, Web3)'
     )
     parser.add_argument(
+        '--min-confidence',
+        type=float,
+        default=0.6,
+        help='Minimum confidence score for qualified leads (0.0-1.0, default: 0.6). Leads below this are filtered out.'
+    )
+    parser.add_argument(
+        '--batch-size',
+        type=int,
+        default=50,
+        help='Process leads in batches of N (default: 50). Enables progressive saving and cost tracking.'
+    )
+    parser.add_argument(
+        '--llm-batch-size',
+        type=int,
+        default=10,
+        help='Number of leads to send to LLM in single API call (default: 10). Higher = better consistency, lower cost.'
+    )
+    parser.add_argument(
         '--headless',
         action='store_true',
         help='Run Playwright browser in headless mode (default: visible for debugging)'
@@ -457,27 +475,69 @@ def main():
             
             if should_qualify:
                 try:
-                    print("\n🤖 Starting concurrent LLM qualification...")
-                    print(f"   Max concurrent requests: {settings.max_concurrent_llm_requests}")
+                    # IMPROVED: Use batch processing with progressive saving
+                    timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    all_qualifications = []  # Track qualifications as we go
+
+                    # Progress callback for saving after each batch
+                    def save_batch_progress(batch_num, total_batches, batch_results, stats):
+                        """Save qualified leads after each batch for crash recovery."""
+                        # Add batch results to cumulative list
+                        all_qualifications.extend(batch_results)
+
+                        # Get leads processed so far
+                        end_idx = len(all_qualifications)
+                        processed_leads = leads[:end_idx]
+
+                        # Filter to qualified with min confidence
+                        qualified_batch = [
+                            (lead, qual)
+                            for lead, qual in zip(processed_leads, all_qualifications)
+                            if qual.get('is_qualified', False) and qual.get('confidence_score', 0.0) >= args.min_confidence
+                        ]
+
+                        if qualified_batch:
+                            qualified_leads_batch, qualified_quals_batch = zip(*qualified_batch)
+
+                            # Save cumulative results after this batch
+                            if args.filter_service:
+                                progress_filename = f"data/qualified_leads_{args.filter_service.lower()}_progress_{timestamp_str}.xlsx"
+                            else:
+                                progress_filename = f"data/qualified_leads_progress_{timestamp_str}.xlsx"
+
+                            export_to_excel(list(qualified_leads_batch), list(qualified_quals_batch), progress_filename)
+                            print(f"   💾 Progress saved ({stats['total_qualified']}/{stats['total_processed']} qualified)")
+
                     if args.filter_service:
                         print(f"   🎯 Filtering for: {args.filter_service} service leads")
-                    
-                    qualifications = asyncio.run(qualify_leads_concurrent(
+
+                    # Use batch processing (progressive saving + cost tracking + LLM-side batching)
+                    qualifications = asyncio.run(qualify_leads_in_batches(
                         leads,
+                        batch_size=args.batch_size,
                         max_concurrent=settings.max_concurrent_llm_requests,
-                        target_service=args.filter_service
+                        llm_batch_size=args.llm_batch_size,  # NEW: LLM-side batching for better consistency
+                        target_service=args.filter_service,
+                        progress_callback=save_batch_progress
                     ))
                     
                     # Add qualification results back to lead objects
                     for lead, qual in zip(leads, qualifications):
                         lead.qualification_result = qual
                     
-                    # Filter to only qualified leads for Excel export
+                    # IMPROVED: Filter to qualified leads with minimum confidence threshold
+                    min_confidence = args.min_confidence
                     qualified_results = [
-                        (lead, qual) 
+                        (lead, qual)
                         for lead, qual in zip(leads, qualifications)
-                        if qual.get('is_qualified', False)
+                        if qual.get('is_qualified', False) and qual.get('confidence_score', 0.0) >= min_confidence
                     ]
+
+                    # Count low-confidence leads that were filtered out
+                    low_confidence_count = sum(
+                        1 for qual in qualifications
+                        if qual.get('is_qualified', False) and qual.get('confidence_score', 0.0) < min_confidence
+                    )
                     
                     if qualified_results:
                         qualified_leads, qualified_quals = zip(*qualified_results)
@@ -504,6 +564,8 @@ def main():
                         if args.filter_service:
                             print(f"🎯 Service Filter: {args.filter_service}")
                         print(f"✅ {qualified_count}/{total_leads} leads qualified ({qualification_rate:.1f}% qualification rate)")
+                        if low_confidence_count > 0:
+                            print(f"⚠️  {low_confidence_count} leads filtered out (confidence < {min_confidence})")
                         print(f"📄 Qualified leads Excel: {excel_filename}")
                     else:
                         print("\n⚠️  No leads were qualified by the LLM")

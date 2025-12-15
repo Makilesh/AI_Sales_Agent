@@ -54,21 +54,44 @@ def load_leads(filename: str) -> list[Lead]:
 def append_leads(leads: list[Lead], filename: str) -> None:
     """Append new leads to existing file, removing duplicates based on URL."""
     existing_leads = load_leads(filename)
-    
+
     # Create set of existing URLs for fast lookup
     existing_urls = {lead.url for lead in existing_leads}
-    
+
     # Filter out duplicates
     new_leads = [lead for lead in leads if lead.url not in existing_urls]
-    
+
     if not new_leads:
         print(f"No new leads to append (all {len(leads)} were duplicates)")
         return
-    
+
+    # IMPROVED (ISSUE #4): Calculate statistics by source and type
+    reddit_leads = [l for l in new_leads if l.source == 'reddit']
+    search_leads = [l for l in reddit_leads if l.metadata.get('targeted_search')]
+    subreddit_leads = [l for l in reddit_leads if not l.metadata.get('targeted_search')]
+    other_sources = [l for l in new_leads if l.source != 'reddit']
+
     # Combine and save
     all_leads = existing_leads + new_leads
     save_leads(all_leads, filename)
+
+    # IMPROVED: Enhanced output with breakdown
     print(f"Appended {len(new_leads)} new leads ({len(leads) - len(new_leads)} duplicates removed)")
+
+    # Show breakdown by source
+    if reddit_leads:
+        print(f"   • Reddit: {len(reddit_leads)} leads")
+        if search_leads:
+            print(f"     - Targeted search: {len(search_leads)} leads")
+        if subreddit_leads:
+            print(f"     - Subreddit scraping: {len(subreddit_leads)} leads")
+
+    if other_sources:
+        # Group other sources
+        from collections import Counter
+        source_counts = Counter(l.source for l in other_sources)
+        for source, count in source_counts.items():
+            print(f"   • {source.title()}: {count} leads")
 
 
 def get_lead_count(filename: str) -> int:

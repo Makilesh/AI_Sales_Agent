@@ -43,9 +43,10 @@ class Lead:
         
         if not self.content or not self.content.strip():
             raise ValueError("Content cannot be empty")
-        
+
+        # IMPROVED: Truncate long content instead of rejecting (Reddit posts can be very long)
         if len(self.content) > 10000:
-            raise ValueError("Content exceeds maximum length of 10000 characters")
+            self.content = self.content[:10000] + "... [content truncated]"
         
         if not self.url or not self.url.startswith(('http://', 'https://')):
             raise ValueError("Invalid URL format")
@@ -73,18 +74,26 @@ class Lead:
     def is_qualified(self, min_engagement: int = 1) -> bool:
         """
         Check if lead meets basic qualification criteria.
-        
-        Relaxed pre-validation to let more leads reach LLM:
-        - Min 10 words (catches brief service requests like "Need RWA dev. Budget $50k")
-        - Min engagement 1 (catches new posts)
+
+        IMPROVED (ISSUE #5): Source-aware validation with relaxed rules for Reddit.
+        - Reddit: Min 8 words, engagement score 0+ (brand new posts)
+        - Other sources: Min 10 words, engagement score 1+
         - Spam filtering (basic checks for promotional content)
         """
-        # Filter 1: Minimum word count (lowered from 20 to 10 words)
+        # IMPROVED: Source-aware rules (Reddit is more relaxed)
+        if self.source == 'reddit':
+            min_words = 8           # Very brief service requests like "[Hiring] RWA dev"
+            min_engagement = 0      # Accept brand new posts (score=0)
+        else:
+            min_words = 10
+            # Use the provided min_engagement parameter for other sources
+
+        # Filter 1: Minimum word count (source-aware)
         word_count = len(self.content.split())
-        if word_count < 10:
+        if word_count < min_words:
             return False
-        
-        # Filter 2: Minimum engagement score (catches new posts)
+
+        # Filter 2: Minimum engagement score (source-aware)
         if self.engagement_score < min_engagement:
             return False
         

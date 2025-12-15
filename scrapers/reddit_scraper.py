@@ -1,6 +1,7 @@
 
 import asyncio
 import traceback  # FIX: Added for debug mode stack traces
+import warnings  # FIX: Suppress PRAW async warnings
 from datetime import datetime, timedelta
 
 import praw
@@ -9,6 +10,10 @@ from praw.models import Submission, Comment
 from config.settings import settings  # FIX: Added for debug_mode access
 from models.lead import Lead
 from scrapers.base import BaseScraper
+
+# FIX: Suppress PRAW async environment warnings (non-breaking, code works correctly)
+warnings.filterwarnings('ignore', message='.*PRAW.*asynchronous.*')
+warnings.filterwarnings('ignore', message='.*It is strongly recommended to use Async PRAW.*')
 
 
 class RedditScraper(BaseScraper):
