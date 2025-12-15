@@ -93,24 +93,61 @@ async def validate_linkedin_cookie():
             success = False
             
         else:
-            # Look for profile elements
+            # Look for profile elements - try multiple selectors
             try:
                 print("🔍 Checking for profile elements...")
-                await page.wait_for_selector('[data-control-name="identity_welcome_message"]', timeout=10000)
                 
-                print("\n✅ AUTHENTICATION SUCCESSFUL!")
-                print("   You are logged into LinkedIn")
-                print("   Your li_at cookie is VALID")
-                print("\n🎉 You can now use the Playwright scraper:")
-                print("   python main.py --sources linkedin_pw --service rwa_linkedin --max-total-leads 10")
+                # Try multiple ways to detect logged-in state
+                profile_found = False
                 
-                input("\n👀 Browser will stay open so you can see the logged-in state. Press Enter to close...")
-                success = True
+                # Method 1: Look for "Me" dropdown
+                try:
+                    await page.wait_for_selector('button:has-text("Me")', timeout=5000)
+                    profile_found = True
+                except:
+                    pass
                 
-            except:
-                print("\n⚠️  PARTIAL SUCCESS")
-                print("   Loaded LinkedIn but couldn't find profile elements")
-                print("   This might still work, but authentication is uncertain")
+                # Method 2: Look for profile image/name
+                if not profile_found:
+                    try:
+                        await page.wait_for_selector('[data-control-name="identity_profile_photo"]', timeout=5000)
+                        profile_found = True
+                    except:
+                        pass
+                
+                # Method 3: Check for common logged-in elements
+                if not profile_found:
+                    try:
+                        await page.wait_for_selector('.global-nav__me', timeout=5000)
+                        profile_found = True
+                    except:
+                        pass
+                
+                if profile_found:
+                    print("\n✅ AUTHENTICATION SUCCESSFUL!")
+                    print("   You are logged into LinkedIn")
+                    print("   Your li_at cookie is VALID")
+                    print("\n🎉 You can now use the Playwright scraper:")
+                    print("   python main.py --sources linkedin_pw --service rwa_linkedin --max-total-leads 10")
+                    success = True
+                else:
+                    print("\n⚠️  Could not auto-detect profile")
+                    print(f"   Current URL: {current_url}")
+                    print("\n   👀 CHECK THE BROWSER: Do you see your profile/name in top-right?")
+                    response = input("   Type 'yes' if you see your profile, or 'no' if not logged in: ").strip().lower()
+                    
+                    if response in ['yes', 'y']:
+                        print("\n✅ Great! Your cookie IS VALID (manual confirmation)")
+                        print("   You can use the Playwright scraper")
+                        success = True
+                    else:
+                        print("\n❌ Cookie appears invalid - update it")
+                        success = False
+                
+                input("\n👀 Press Enter to close browser...")
+                
+            except Exception as e:
+                print(f"\n⚠️  Detection error: {e}")
                 print(f"   Current URL: {current_url}")
                 
                 input("\n👀 Check if you see your profile in top-right corner. Press Enter to close...")
