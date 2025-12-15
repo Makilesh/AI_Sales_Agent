@@ -741,13 +741,86 @@ They are actively looking for alternatives to their current provider - prime con
 
         return all_results
 
+    def _extract_smart_content(self, content: str, max_chars: int = 500) -> str:
+        """
+        Smart content extraction that prioritizes buying signals over blind truncation.
+
+        Strategy:
+        1. Extract buying signal snippets (budget, timeline, urgency)
+        2. Take first 300 chars for context
+        3. If space remains, take last 100 chars (often contains CTAs/budgets)
+        4. Total: ~500 chars with maximum signal density
+
+        Args:
+            content: Full lead content
+            max_chars: Maximum characters to extract (default: 500)
+
+        Returns:
+            Smartly extracted content with buying signals prioritized
+        """
+        if len(content) <= max_chars:
+            return content
+
+        # Extract buying signal snippets
+        signal_snippets = []
+        content_lower = content.lower()
+
+        # Buying signal patterns with context
+        signal_patterns = [
+            (r'budget[:\s]*\$?[\d,]+[k]?', 80),  # "Budget: $50k" with 80 chars context
+            (r'timeline[:\s]*[^\n]{0,50}', 60),   # "Timeline: Q1 2025"
+            (r'deadline[:\s]*[^\n]{0,50}', 60),   # "Deadline: Dec 31"
+            (r'willing to pay[^\n]{0,40}', 50),   # "willing to pay $X"
+            (r'\$[\d,]+k?\s*(?:budget|price|cost)', 50),  # "$50k budget"
+            (r'(?:asap|urgent|immediately)', 40),  # Urgency markers
+        ]
+
+        import re
+        for pattern, context_size in signal_patterns:
+            matches = re.finditer(pattern, content_lower, re.IGNORECASE)
+            for match in matches:
+                start = max(0, match.start() - context_size // 2)
+                end = min(len(content), match.end() + context_size // 2)
+                snippet = content[start:end].strip()
+                if snippet and snippet not in signal_snippets:
+                    signal_snippets.append(snippet)
+
+        # Calculate space allocation
+        signal_text = ' ... '.join(signal_snippets[:3])  # Max 3 signals
+        signal_length = len(signal_text)
+
+        # Allocate remaining space between beginning and end
+        remaining = max_chars - signal_length - 10  # Reserve 10 for separators
+
+        if signal_snippets:
+            # If we found signals, use 70% for beginning, 30% for end
+            beginning_chars = int(remaining * 0.7)
+            end_chars = int(remaining * 0.3)
+
+            beginning = content[:beginning_chars].strip()
+            ending = content[-end_chars:].strip() if end_chars > 0 else ""
+
+            # Combine: beginning + signals + end
+            parts = [beginning, signal_text, ending]
+            return ' [...] '.join([p for p in parts if p])
+        else:
+            # No signals found, use hybrid truncation (70% beginning, 30% end)
+            beginning_chars = int(max_chars * 0.7)
+            end_chars = int(max_chars * 0.3)
+
+            beginning = content[:beginning_chars].strip()
+            ending = content[-end_chars:].strip()
+
+            return f"{beginning} [...] {ending}"
+
     def _build_batch_qualification_prompt(self, leads: list[Lead]) -> str:
         """Build prompt for qualifying multiple leads at once."""
 
         # Build lead summaries
         lead_summaries = []
         for idx, lead in enumerate(leads, 1):
-            content = lead.content[:500]  # Truncate to fit multiple leads
+            # IMPROVED: Smart content extraction instead of blind truncation
+            content = self._extract_smart_content(lead.content, max_chars=500)
             title = lead.title or ""
             full_text = f"{title}\n\n{content}" if title else content
 
