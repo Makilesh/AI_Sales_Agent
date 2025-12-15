@@ -129,10 +129,20 @@ class LinkedInSeleniumScraper(BaseScraper):
         chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
         chrome_options.add_experimental_option('useAutomationExtension', False)
         
-        # Proxy support
+        # Proxy support (supports http://user:pass@host:port format)
         if self.proxy:
+            # Format: http://username:password@host:port or http://host:port
             chrome_options.add_argument(f'--proxy-server={self.proxy}')
-            print(f"   • Proxy: {self.proxy.split('@')[-1] if '@' in self.proxy else self.proxy}")
+            
+            # Hide sensitive credentials in output
+            if '@' in self.proxy:
+                display_proxy = self.proxy.split('@')[-1]
+                print(f"   • Proxy: {display_proxy} (authenticated)")
+            else:
+                print(f"   • Proxy: {self.proxy}")
+            
+            # Additional proxy settings for better compatibility
+            chrome_options.add_argument('--proxy-bypass-list=<-loopback>')
         
         # Preferences
         prefs = {
@@ -174,7 +184,16 @@ class LinkedInSeleniumScraper(BaseScraper):
             
             # Navigate to feed to verify login
             self.driver.get('https://www.linkedin.com/feed/')
-            time.sleep(3)
+            time.sleep(5)  # Increased wait time
+            
+            # Check for rate limiting first
+            if self._check_rate_limit_error():
+                print(f"\n⚠️  Rate limit detected immediately during authentication")
+                if not self._handle_rate_limit(wait_minutes=60):
+                    raise Exception("Rate limit detected. Please wait or use a proxy.")
+                # Try again after waiting
+                self.driver.get('https://www.linkedin.com/feed/')
+                time.sleep(5)
             
             # Check if logged in
             current_url = self.driver.current_url
@@ -190,6 +209,52 @@ class LinkedInSeleniumScraper(BaseScraper):
                 self.driver.quit()
             raise
     
+    def _check_rate_limit_error(self) -> bool:
+        """Check if page shows rate limit error (429)."""
+        try:
+            page_source = self.driver.page_source.lower()
+            current_url = self.driver.current_url
+            
+            # Check for rate limit indicators
+            if any(indicator in page_source for indicator in ['429', 'too many requests', 'rate limit']):
+                return True
+            if '429' in current_url or 'error' in current_url:
+                return True
+            
+            # Check for HTTP error pages
+            if 'http error' in page_source and '429' in page_source:
+                return True
+                
+        except:
+            pass
+        
+        return False
+    
+    def _handle_rate_limit(self, wait_minutes: int = 60):
+        """Handle rate limit by waiting."""
+        print(f"\n⚠️  RATE LIMIT DETECTED (HTTP 429)")
+        print(f"   LinkedIn has temporarily blocked your IP")
+        print(f"   This usually happens after too many requests")
+        print(f"\n💡 Solutions:")
+        print(f"   1. Wait {wait_minutes} minutes and try again")
+        print(f"   2. Use a different network (mobile hotspot, VPN)")
+        print(f"   3. Configure a proxy in .env: LINKEDIN_PROXY=http://proxy:port")
+        print(f"   4. Try other platforms: --sources reddit discord slack")
+        
+        user_choice = input(f"\n❓ Wait {wait_minutes} minutes now? (yes/no): ").strip().lower()
+        
+        if user_choice in ['yes', 'y']:
+            print(f"\n⏳ Waiting {wait_minutes} minutes for rate limit to reset...")
+            for i in range(wait_minutes):
+                remaining = wait_minutes - i
+                print(f"   {remaining} minutes remaining...", end='\r')
+                time.sleep(60)
+            print(f"\n✅ Wait complete! Resuming scraping...")
+            return True
+        else:
+            print(f"\n⚠️  Scraping aborted. Try again later or use a proxy.")
+            return False
+    
     def _apply_rate_limit(self):
         """Apply rate limiting with human-like delays."""
         self.request_count += 1
@@ -199,10 +264,10 @@ class LinkedInSeleniumScraper(BaseScraper):
         min_delay = 60.0 / self.rate_limit  # Minimum delay between requests
         
         if elapsed < min_delay:
-            sleep_time = min_delay - elapsed + random.uniform(2, 5)  # Add human delay
+            sleep_time = min_delay - elapsed + random.uniform(3, 8)  # Increased human delay
             time.sleep(sleep_time)
         else:
-            time.sleep(random.uniform(2, 5))  # Always add some delay
+            time.sleep(random.uniform(3, 8))  # Always add some delay
         
         self.last_request_time = time.time()
     
@@ -439,12 +504,18 @@ class LinkedInSeleniumScraper(BaseScraper):
         self._apply_rate_limit()
         
         try:
+            # Check for rate limiting before proceeding
+            if self._check_rate_limit_error():
+                print(f"\n⚠️  Rate limit detected for keyword '{keyword}'")
+                if not self._handle_rate_limit(wait_minutes=60):
+                    return leads
+            
             # Make sure we're on feed/home page
             current_url = self.driver.current_url
             if 'feed' not in current_url and 'linkedin.com' in current_url:
                 print(f"  → Navigating to feed first...")
                 self.driver.get('https://www.linkedin.com/feed/')
-                time.sleep(3)
+                time.sleep(5)  # Increased delay
             
             # Find search box
             print(f"  → Finding search box...")
