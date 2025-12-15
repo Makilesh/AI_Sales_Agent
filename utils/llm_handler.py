@@ -71,7 +71,19 @@ REJECT leads about other services even if they're high-quality inquiries.
         
         # Competitor detection
         competitor_context = self._detect_competitor_mentions(full_text)
-        
+
+        # IMPROVED (ISSUE #1): Reddit metadata boost for targeted search leads
+        reddit_boost_context = ""
+        if lead.source == 'reddit' and lead.metadata.get('targeted_search'):
+            search_phrase = lead.metadata.get('search_phrase', 'unknown')
+            reddit_boost_context = f"""🎯 **HIGH-INTENT SEARCH LEAD:**
+This lead was found via targeted Reddit search for: "{search_phrase}"
+This indicates ACTIVE service-seeking behavior (not just browsing subreddit).
+
+**QUALIFICATION BOOST:** Increase confidence by +0.15 if this is a genuine service inquiry.
+Search-targeted leads have 3x higher conversion rates than general subreddit posts.
+"""
+
         prompt = f"""You are qualifying sales leads for Shamla Tech (India-based Web3/RWA tokenization firm). ONLY qualify if someone is ACTIVELY SEEKING our services.
 
 **OUR SERVICES (Shamla Tech):**
@@ -86,6 +98,8 @@ REJECT leads about other services even if they're high-quality inquiries.
 - NetSet Software, Nadcab Labs, Dev Technosys, RedDuck, Quytech
 
 {competitor_context}
+
+{reddit_boost_context}
 
 {service_focus}
 

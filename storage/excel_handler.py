@@ -30,10 +30,11 @@ def export_to_excel(
         wb = Workbook()
         ws = wb.active
         ws.title = "Qualified Leads"
-        
+
         headers = [
-            "Author", "Source", "Content", "URL", "Engagement Score",
-            "Is Qualified", "Confidence", "Reason", "Service Match", "Timestamp"
+            "Author", "Source", "Subreddit", "Post Type", "Content", "URL",
+            "Engagement Score", "Targeted Search", "Search Phrase",
+            "Is Qualified", "Confidence", "LLM Provider", "Reason", "Service Match", "Timestamp"
         ]
         
         header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
@@ -60,15 +61,20 @@ def export_to_excel(
     ws = wb.active
     ws.title = "Qualified Leads"
     
-    # Define headers
+    # Define headers (IMPROVED: Added metadata columns for Reddit)
     headers = [
         "Author",
-        "Source", 
+        "Source",
+        "Subreddit",           # NEW: Reddit subreddit name
+        "Post Type",           # NEW: post/comment/submission
         "Content",
         "URL",
         "Engagement Score",
+        "Targeted Search",     # NEW: High-intent search flag
+        "Search Phrase",       # NEW: Which search phrase matched
         "Is Qualified",
         "Confidence",
+        "LLM Provider",        # NEW: openai/gemini fallback tracking
         "Reason",
         "Service Match",
         "Timestamp"
@@ -91,6 +97,7 @@ def export_to_excel(
     # Define fills for conditional formatting
     qualified_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")  # Light green
     not_qualified_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")  # Light red
+    search_lead_fill = PatternFill(start_color="FFD966", end_color="FFD966", fill_type="solid")  # Gold/yellow for targeted search leads (HIGHEST PRIORITY)
     
     # Write data rows
     for row_idx, (lead, qual) in enumerate(combined, 2):
@@ -103,15 +110,20 @@ def export_to_excel(
         # Format timestamp
         timestamp_str = lead.timestamp.strftime("%Y-%m-%d %H:%M:%S")
         
-        # Prepare row data
+        # Prepare row data (IMPROVED: Added metadata columns)
         row_data = [
             lead.author,
             lead.source,
+            lead.subreddit or "N/A",                                    # NEW: Subreddit
+            lead.metadata.get('post_type', 'N/A'),                      # NEW: Post type
             content,
             lead.url,
             lead.engagement_score,
+            "Yes" if lead.metadata.get('targeted_search') else "No",   # NEW: Search flag
+            lead.metadata.get('search_phrase', 'N/A'),                  # NEW: Search phrase
             "Yes" if qual.get('is_qualified', False) else "No",
             round(qual.get('confidence_score', 0.0), 2),
+            qual.get('llm_provider', 'N/A'),                            # NEW: LLM provider
             qual.get('reason', ''),
             service_match,
             timestamp_str
@@ -120,26 +132,35 @@ def export_to_excel(
         # Write row
         for col_idx, value in enumerate(row_data, 1):
             cell = ws.cell(row=row_idx, column=col_idx, value=value)
-            cell.alignment = Alignment(vertical="top", wrap_text=(col_idx in [3, 8]))  # Wrap text for Content and Reason
-            
-            # Apply conditional formatting to entire row
-            if qual.get('is_qualified', False):
+            cell.alignment = Alignment(vertical="top", wrap_text=(col_idx in [5, 13]))  # Wrap text for Content (col 5) and Reason (col 13)
+
+            # IMPROVED (ISSUE #3): Apply conditional formatting with search lead priority
+            # Priority: Targeted Search (gold) > Qualified (green) > Not Qualified (red)
+            if lead.metadata.get('targeted_search'):
+                # Gold highlight for targeted search leads (HIGHEST PRIORITY)
+                cell.fill = search_lead_fill
+            elif qual.get('is_qualified', False):
                 cell.fill = qualified_fill
             else:
                 cell.fill = not_qualified_fill
     
-    # Auto-adjust column widths
+    # Auto-adjust column widths (IMPROVED: Updated for new columns)
     column_widths = {
         1: 20,   # Author
         2: 12,   # Source
-        3: 50,   # Content
-        4: 40,   # URL
-        5: 15,   # Engagement Score
-        6: 12,   # Is Qualified
-        7: 12,   # Confidence
-        8: 50,   # Reason
-        9: 30,   # Service Match
-        10: 20   # Timestamp
+        3: 18,   # Subreddit (NEW)
+        4: 12,   # Post Type (NEW)
+        5: 50,   # Content
+        6: 40,   # URL
+        7: 15,   # Engagement Score
+        8: 15,   # Targeted Search (NEW)
+        9: 30,   # Search Phrase (NEW)
+        10: 12,  # Is Qualified
+        11: 12,  # Confidence
+        12: 12,  # LLM Provider (NEW)
+        13: 50,  # Reason
+        14: 30,  # Service Match
+        15: 20   # Timestamp
     }
     
     for col_idx, width in column_widths.items():
@@ -152,9 +173,12 @@ def export_to_excel(
     wb.save(filename)
     
     qualified_count = sum(1 for _, q in combined if q.get('is_qualified', False))
+    search_lead_count = sum(1 for l, _ in combined if l.metadata.get('targeted_search'))
     print(f"\n✅ Exported {len(leads)} leads to {filename}")
     print(f"   • Qualified: {qualified_count}")
     print(f"   • Not Qualified: {len(leads) - qualified_count}")
+    if search_lead_count > 0:
+        print(f"   • 🎯 Targeted Search Leads: {search_lead_count} (highlighted in gold)")
     print(f"   • Sorted by confidence score (highest first)")
 
 
