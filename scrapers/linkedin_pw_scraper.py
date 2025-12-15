@@ -608,7 +608,8 @@ class LinkedInPlaywrightScraper(BaseScraper):
     
     async def _scrape_keyword_impl(self, keyword: str, posts_limit: int) -> list[Lead]:
         """
-        Implementation of keyword scraping with infinite scroll pagination.
+        Implementation of keyword scraping using manual search simulation.
+        LinkedIn blocks direct search URL navigation, so we simulate typing in search box.
         
         Args:
             keyword: Search keyword
@@ -619,27 +620,75 @@ class LinkedInPlaywrightScraper(BaseScraper):
         """
         leads = []
         
-        # Build search URL
-        from urllib.parse import quote
-        encoded_keyword = quote(keyword)
-        search_url = f"https://www.linkedin.com/search/results/content/?keywords={encoded_keyword}&sortBy=date_posted"
-        
-        print(f"  → Navigating to: {search_url[:80]}...")
+        print(f"  → Searching for: '{keyword}' (using search box simulation)")
         
         # Apply rate limiting
         await self._apply_rate_limit()
         
-        # Navigate to search page with more forgiving wait strategy
+        # WORKAROUND: Use search box instead of direct URL navigation
+        # LinkedIn blocks automated direct search URLs but allows search box usage
         try:
-            await self.page.goto(search_url, wait_until='domcontentloaded', timeout=30000)
-            await asyncio.sleep(random.uniform(4, 7))  # Random wait to mimic human behavior
+            # Make sure we're on feed page
+            current_url = self.page.url
+            if 'feed' not in current_url:
+                print(f"  → Navigating to feed first...")
+                await self.page.goto('https://www.linkedin.com/feed/', wait_until='domcontentloaded', timeout=30000)
+                await asyncio.sleep(2)
+            
+            # Find and click search box
+            print(f"  → Using search box...")
+            search_selectors = [
+                'input[placeholder*="Search"]',
+                '.search-global-typeahead__input',
+                'input[aria-label*="Search"]',
+                'input.search-global-typeahead__input'
+            ]
+            
+            search_input = None
+            for selector in search_selectors:
+                try:
+                    search_input = await self.page.wait_for_selector(selector, timeout=5000)
+                    if search_input:
+                        break
+                except:
+                    continue
+            
+            if not search_input:
+                raise Exception("Could not find search box")
+            
+            # Click and type keyword
+            await search_input.click()
+            await asyncio.sleep(random.uniform(0.5, 1))
+            await search_input.fill('')  # Clear any existing text
+            await asyncio.sleep(random.uniform(0.3, 0.6))
+            
+            # Type character by character to mimic human
+            for char in keyword:
+                await search_input.type(char, delay=random.randint(50, 150))
+            
+            await asyncio.sleep(random.uniform(1, 2))
+            
+            # Press Enter to search
+            await search_input.press('Enter')
+            await asyncio.sleep(random.uniform(3, 5))
+            
+            # Wait for search results page
+            await self.page.wait_for_load_state('domcontentloaded', timeout=15000)
+            await asyncio.sleep(2)
+            
+            # Click on "Posts" filter if available
+            try:
+                posts_filter = await self.page.wait_for_selector('button:has-text("Posts")', timeout=5000)
+                if posts_filter:
+                    await posts_filter.click()
+                    await asyncio.sleep(random.uniform(2, 4))
+            except:
+                print(f"  ℹ️  Posts filter not found, continuing with current results...")
+            
         except Exception as e:
-            print(f"  ⚠️ Navigation warning: {str(e)[:80]}")
+            print(f"  ⚠️ Search box simulation failed: {str(e)[:100]}")
             print(f"  Current URL: {self.page.url}")
-            # Continue anyway if we're on LinkedIn
-            if 'linkedin.com' not in self.page.url:
-                raise
-            await asyncio.sleep(3)
+            return leads
         
         # Check for authwall
         if 'authwall' in self.page.url or 'login' in self.page.url:
