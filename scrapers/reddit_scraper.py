@@ -1,6 +1,6 @@
 
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import praw
 from praw.models import Submission, Comment
@@ -43,12 +43,41 @@ class RedditScraper(BaseScraper):
         Reddit uses help-seeking subreddits, so we trust the subreddit selection
         and let ALL posts through (LLM will filter for service match).
         """
-        print(f"   � Reddit: Keyword filter disabled (trusting help-seeking subreddits)")
+        print(f"   ℹ️ Reddit: Keyword filter disabled (trusting help-seeking subreddits)")
         return leads  # Return all leads, no keyword filter
+    
+    def _get_time_filter_for_praw(self) -> str:
+        """
+        Convert days_filter to PRAW time_filter parameter.
+        
+        Returns:
+            'day', 'week', 'month', 'year', or 'all'
+        """
+        if self.days_filter == 0:
+            return 'all'
+        elif self.days_filter <= 1:
+            return 'day'
+        elif self.days_filter <= 7:
+            return 'week'
+        elif self.days_filter <= 30:
+            return 'month'
+        elif self.days_filter <= 365:
+            return 'year'
+        else:
+            return 'all'
     
     async def scrape(self) -> list[Lead]:
         """Scrape posts and comments from specified subreddits."""
         all_leads: list[Lead] = []
+        
+        # Print time filter info
+        if self.days_filter > 0:
+            cutoff_date = datetime.now() - timedelta(days=self.days_filter)
+            time_filter = self._get_time_filter_for_praw()
+            print(f"   🕒 Reddit: Filtering posts from last {self.days_filter} days (PRAW filter: '{time_filter}')")
+            print(f"   📅 Cutoff date: {cutoff_date.strftime('%Y-%m-%d %H:%M')}")
+        else:
+            print(f"   ℹ️ Reddit: No time filter (fetching all posts)")
         
         # Scrape all subreddits with multi-feed approach
         for subreddit_name in self.subreddits:
@@ -80,16 +109,19 @@ class RedditScraper(BaseScraper):
             "tokenization platform recommendation"
         ]
         
+        # Get PRAW time filter
+        time_filter = self._get_time_filter_for_praw()
+        
         # Search across all subreddits
         try:
             for phrase in search_phrases:
                 await self._apply_rate_limit()
                 
-                # Search Reddit with time filter (last month)
+                # Search Reddit with time filter
                 search_results = await asyncio.to_thread(
                     lambda: list(self.reddit.subreddit('all').search(
                         phrase, 
-                        time_filter='month',
+                        time_filter=time_filter,
                         limit=20
                     ))
                 )
@@ -102,6 +134,9 @@ class RedditScraper(BaseScraper):
                         post_lead = self._create_lead_from_post(submission, submission.subreddit.display_name)
                         if post_lead:
                             # Mark as search-targeted lead
+                            post_lead.metadata['search_phrase'] = phrase
+                            post_lead.metadata['targeted_search'] = True
+                            leads.append(post_lead)
                             post_lead.metadata['search_phrase'] = phrase
                             post_lead.metadata['targeted_search'] = True
                             leads.append(post_lead)
@@ -128,7 +163,25 @@ class RedditScraper(BaseScraper):
                                         comment_lead.metadata['search_phrase'] = phrase
                                         comment_lead.metadata['targeted_search'] = True
                                         leads.append(comment_lead)
+                            await self._apply_rate_limit()
+                            await asyncio.to_thread(submission.comments.replace_more, limit=0)
+                            await self._apply_rate_limit()
+                            all_comments = await asyncio.to_thread(submission.comments.list)
+                            
+                            for comment in all_comments[:30]:
+                                if isinstance(comment, Comment):
+                                    comment_lead = self._create_lead_from_comment(
+                                        comment,
+                                        submission,
+                                        submission.subreddit.display_name
+                                    )
+                                    if comment_lead:
+                                        comment_lead.metadata['search_phrase'] = phrase
+                                        comment_lead.metadata['targeted_search'] = True
+                                        leads.append(comment_lead)
                         except Exception as e:
+                            print(f"Error processing search comments for {submission.id}: {e}")
+                            continue
                             print(f"Error processing search comments for {submission.id}: {e}")
                             continue
             
@@ -148,20 +201,67 @@ class RedditScraper(BaseScraper):
             # Wrap PRAW call in thread executor for true async
             subreddit = await asyncio.to_thread(self.reddit.subreddit, subreddit_name)
             
-            # Scrape from multiple feeds for maximum coverage
-            # Hot posts (current trending)
-            hot_posts = await asyncio.to_thread(lambda: list(subreddit.hot(limit=50)))
-            # New posts (recent activity)
-            new_posts = await asyncio.to_thread(lambda: list(subreddit.new(limit=50)))
-            # Top posts from the past week (high-quality content)
-            top_week_posts = await asyncio.to_thread(lambda: list(subreddit.top(time_filter='week', limit=30)))
-            # Top posts from the past month (more high-quality content)
-            top_month_posts = await asyncio.to_thread(lambda: list(subreddit.top(time_filter='month', limit=20)))
+            # Get PRAW time filter
+            time_filter = self._get_time_filter_for_praw()
             
-            # Combine and deduplicate
-            all_posts = {post.id: post for post in hot_posts + new_posts + top_week_posts + top_month_posts}.values()
+            # Calculate cutoff time for early stopping
+            cutoff_time = datetime.now() - timedelta(days=self.days_filter) if self.days_filter > 0 else None
             
-            for submission in all_posts:
+            # Helper to fetch posts with early date-based stopping
+            def fetch_with_cutoff(generator, max_fetch=100):
+                """Fetch posts but stop early if we hit old content."""
+                posts = []
+                old_post_count = 0
+                
+                for post in generator:
+                    if cutoff_time:
+                        post_date = datetime.fromtimestamp(post.created_utc)
+                        if post_date < cutoff_time:
+                            old_post_count += 1
+                            # Stop if we've seen 5 old posts in a row (new/hot are chronological)
+                            if old_post_count >= 5:
+                                break
+                            continue
+                        else:
+                            old_post_count = 0  # Reset counter on fresh post
+                    
+                    posts.append(post)
+                    if len(posts) >= max_fetch:
+                        break
+                
+                return posts
+            
+            # Fetch posts with smart limits based on time filter
+            if self.days_filter <= 1:
+                # Last 24 hours: new posts are most relevant
+                new_posts = await asyncio.to_thread(lambda: fetch_with_cutoff(subreddit.new(limit=200), 80))
+                hot_posts = await asyncio.to_thread(lambda: fetch_with_cutoff(subreddit.hot(limit=100), 40))
+                top_posts = await asyncio.to_thread(lambda: list(subreddit.top(time_filter='day', limit=30)))
+            elif self.days_filter <= 7:
+                # Last week: balanced approach
+                new_posts = await asyncio.to_thread(lambda: fetch_with_cutoff(subreddit.new(limit=150), 50))
+                hot_posts = await asyncio.to_thread(lambda: fetch_with_cutoff(subreddit.hot(limit=80), 30))
+                top_posts = await asyncio.to_thread(lambda: list(subreddit.top(time_filter='week', limit=50)))
+            elif self.days_filter <= 30:
+                # Last month: focus on top posts
+                new_posts = await asyncio.to_thread(lambda: fetch_with_cutoff(subreddit.new(limit=100), 30))
+                hot_posts = await asyncio.to_thread(lambda: fetch_with_cutoff(subreddit.hot(limit=60), 20))
+                top_posts = await asyncio.to_thread(lambda: list(subreddit.top(time_filter='month', limit=60)))
+            else:
+                # Longer periods or no filter: standard approach
+                new_posts = await asyncio.to_thread(lambda: list(subreddit.new(limit=50)))
+                hot_posts = await asyncio.to_thread(lambda: list(subreddit.hot(limit=50)))
+                top_week = await asyncio.to_thread(lambda: list(subreddit.top(time_filter='week', limit=30)))
+                top_month = await asyncio.to_thread(lambda: list(subreddit.top(time_filter=time_filter, limit=40)))
+                top_posts = top_week + top_month
+            
+            # Combine and deduplicate (all posts already filtered by date)
+            all_posts = {post.id: post for post in hot_posts + new_posts + top_posts}.values()
+            posts_to_process = list(all_posts)
+            
+            print(f"   📊 r/{subreddit_name}: Processing {len(posts_to_process)}/{len(all_posts)} posts within time range")
+            
+            for submission in posts_to_process:
                 await self._apply_rate_limit()
                 
                 # Check post
