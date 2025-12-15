@@ -213,8 +213,13 @@ class LinkedInPlaywrightScraper(BaseScraper):
             
             # Verify authentication by navigating to LinkedIn
             print("🔐 Verifying authentication...")
-            await self.page.goto('https://www.linkedin.com/feed/', wait_until='networkidle', timeout=60000)
-            await asyncio.sleep(5)  # Longer wait to mimic human behavior
+            try:
+                await self.page.goto('https://www.linkedin.com/feed/', wait_until='domcontentloaded', timeout=30000)
+                await asyncio.sleep(5)  # Longer wait to mimic human behavior
+            except Exception as e:
+                print(f"  ⚠️ Navigation timeout: {str(e)[:100]}")
+                print("  Checking authentication status anyway...")
+                await asyncio.sleep(3)
             
             # Check if we're logged in (look for profile elements)
             current_url = self.page.url
@@ -624,9 +629,17 @@ class LinkedInPlaywrightScraper(BaseScraper):
         # Apply rate limiting
         await self._apply_rate_limit()
         
-        # Navigate to search page with longer timeout and networkidle wait
-        await self.page.goto(search_url, wait_until='networkidle', timeout=60000)
-        await asyncio.sleep(random.uniform(4, 7))  # Random wait to mimic human behavior
+        # Navigate to search page with more forgiving wait strategy
+        try:
+            await self.page.goto(search_url, wait_until='domcontentloaded', timeout=30000)
+            await asyncio.sleep(random.uniform(4, 7))  # Random wait to mimic human behavior
+        except Exception as e:
+            print(f"  ⚠️ Navigation warning: {str(e)[:80]}")
+            print(f"  Current URL: {self.page.url}")
+            # Continue anyway if we're on LinkedIn
+            if 'linkedin.com' not in self.page.url:
+                raise
+            await asyncio.sleep(3)
         
         # Check for authwall
         if 'authwall' in self.page.url or 'login' in self.page.url:
