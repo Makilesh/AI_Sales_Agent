@@ -149,6 +149,15 @@ class LinkedInPlaywrightScraper(BaseScraper):
                     '--disable-setuid-sandbox',
                     '--disable-web-security',
                     '--disable-features=IsolateOrigins,site-per-process',
+                    '--disable-infobars',
+                    '--window-size=1920,1080',
+                    '--start-maximized',
+                    '--disable-extensions',
+                    '--disable-gpu',
+                    '--enable-features=NetworkService,NetworkServiceInProcess',
+                    '--disable-background-timer-throttling',
+                    '--disable-backgrounding-occluded-windows',
+                    '--disable-renderer-backgrounding',
                 ]
             )
             
@@ -166,8 +175,14 @@ class LinkedInPlaywrightScraper(BaseScraper):
                 'extra_http_headers': {
                     'Accept-Language': 'en-US,en;q=0.9',
                     'Accept-Encoding': 'gzip, deflate, br',
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
                     'Connection': 'keep-alive',
+                    'DNT': '1',
+                    'Upgrade-Insecure-Requests': '1',
+                    'Sec-Fetch-Dest': 'document',
+                    'Sec-Fetch-Mode': 'navigate',
+                    'Sec-Fetch-Site': 'none',
+                    'Sec-Fetch-User': '?1',
                     'Upgrade-Insecure-Requests': '1',
                 }
             }
@@ -198,15 +213,22 @@ class LinkedInPlaywrightScraper(BaseScraper):
             
             # Verify authentication by navigating to LinkedIn
             print("🔐 Verifying authentication...")
-            await self.page.goto('https://www.linkedin.com/feed/', wait_until='domcontentloaded', timeout=30000)
-            await asyncio.sleep(3)
+            await self.page.goto('https://www.linkedin.com/feed/', wait_until='networkidle', timeout=60000)
+            await asyncio.sleep(5)  # Longer wait to mimic human behavior
             
             # Check if we're logged in (look for profile elements)
             current_url = self.page.url
-            if 'authwall' in current_url or 'login' in current_url:
-                raise Exception("Authentication failed - redirected to login page. Check your li_at cookie.")
+            if 'authwall' in current_url or 'login' in current_url or 'checkpoint' in current_url:
+                print(f"  ⚠️  Current URL: {current_url}")
+                raise Exception(f"Authentication failed - redirected to {current_url}. Your li_at cookie may be expired or invalid. Get a fresh cookie from linkedin.com while logged in.")
             
-            print("✅ Browser initialized and authenticated successfully")
+            # Additional check: verify we can see our profile elements
+            try:
+                await self.page.wait_for_selector('[data-control-name="identity_welcome_message"]', timeout=10000)
+                print("✅ Browser initialized and authenticated successfully")
+            except:
+                print("  ⚠️  Warning: Could not find profile elements, but not redirected to login. Proceeding anyway...")
+                print(f"  Current URL: {current_url}")
             
         except Exception as e:
             print(f"❌ Failed to initialize browser: {e}")
@@ -602,9 +624,9 @@ class LinkedInPlaywrightScraper(BaseScraper):
         # Apply rate limiting
         await self._apply_rate_limit()
         
-        # Navigate to search page
-        await self.page.goto(search_url, wait_until='domcontentloaded', timeout=30000)
-        await asyncio.sleep(3)  # Wait for dynamic content
+        # Navigate to search page with longer timeout and networkidle wait
+        await self.page.goto(search_url, wait_until='networkidle', timeout=60000)
+        await asyncio.sleep(random.uniform(4, 7))  # Random wait to mimic human behavior
         
         # Check for authwall
         if 'authwall' in self.page.url or 'login' in self.page.url:

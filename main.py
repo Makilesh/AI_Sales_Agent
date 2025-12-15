@@ -182,6 +182,10 @@ async def scrape_linkedin_playwright() -> list[Lead]:
         return []
     
     print("\n=== Starting LinkedIn Playwright Scraping ===")
+    # Get headless setting from command line args or default to False for debugging
+    headless_mode = getattr(main, '_headless_arg', False)
+    if not headless_mode:
+        print("  ℹ️  Running in VISIBLE mode for debugging. Use --headless to run hidden.")
     try:
         scraper = LinkedInPlaywrightScraper(
             linkedin_cookie=settings.linkedin_cookie,
@@ -189,7 +193,7 @@ async def scrape_linkedin_playwright() -> list[Lead]:
             max_posts_per_keyword=settings.linkedin_apify.max_posts_per_keyword,
             max_total_leads=settings.scraping.max_total_leads,
             rate_limit=10,  # 10 requests per minute
-            headless=True,
+            headless=headless_mode,
             days_filter=settings.linkedin_apify.days_filter,
             proxy=settings.linkedin_proxy if hasattr(settings, 'linkedin_proxy') else None
         )
@@ -253,6 +257,9 @@ def filter_qualified_leads(leads: list[Lead]) -> list[Lead]:
 
 def main():
     """Main execution function."""
+    # Initialize headless attribute for use in async functions
+    main._headless_arg = False
+    
     parser = argparse.ArgumentParser(
         description="Multi-Source Lead Scraping Engine - Phase 1"
     )
@@ -306,6 +313,11 @@ def main():
         choices=['RWA', 'Crypto', 'AI/ML', 'Blockchain', 'Web3'],
         help='LLM filter: ONLY qualify leads asking for specific service (RWA, Crypto, AI/ML, Blockchain, Web3)'
     )
+    parser.add_argument(
+        '--headless',
+        action='store_true',
+        help='Run Playwright browser in headless mode (default: visible for debugging)'
+    )
     
     args = parser.parse_args()
     
@@ -338,6 +350,9 @@ def main():
     # Validate settings
     if not settings.validate():
         print("\nWarning: Some credentials are missing. Scrapers may fail.")
+    
+    # Store headless argument for use in scrape functions
+    main._headless_arg = args.headless
     
     try:
         # Run scrapers
