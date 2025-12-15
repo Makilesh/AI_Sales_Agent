@@ -542,6 +542,10 @@ class AppSettings:
     linkedin_apify: LinkedInApifyConfig = field(default_factory=LinkedInApifyConfig)
     scraping: ScrapingConfig = field(default_factory=ScrapingConfig)
     
+    # LinkedIn Playwright Settings
+    linkedin_cookie: str = config("LINKEDIN_COOKIE", default="")
+    linkedin_proxy: str = config("LINKEDIN_PROXY", default="")
+    
     # LLM Qualification Settings
     openai_api_key: str = config("OPENAI_API_KEY", default="")
     llm_model: str = "gpt-4-turbo"

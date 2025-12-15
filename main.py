@@ -11,7 +11,7 @@ from scrapers.reddit_scraper import RedditScraper
 from scrapers.discord_scraper import DiscordScraper
 from scrapers.slack_scraper import SlackScraper
 from scrapers.linkedin_public_scraper import LinkedInPublicScraper
-from scrapers.linkedin_public_scraper import LinkedInPublicScraper
+from scrapers.linkedin_pw_scraper import LinkedInPlaywrightScraper
 from storage.json_handler import append_leads, save_leads
 from storage.excel_handler import export_to_excel
 from utils.linkedin_helpers import get_linkedin_user_agents
@@ -175,6 +175,32 @@ async def scrape_linkedin_apify() -> list[Lead]:
         return []
 
 
+async def scrape_linkedin_playwright() -> list[Lead]:
+    """Scrape LinkedIn using Playwright browser automation."""
+    if not settings.linkedin_cookie:
+        print("LinkedIn Playwright: Cookie not configured, skipping")
+        return []
+    
+    print("\n=== Starting LinkedIn Playwright Scraping ===")
+    try:
+        scraper = LinkedInPlaywrightScraper(
+            linkedin_cookie=settings.linkedin_cookie,
+            keywords=settings.scraping.keywords,
+            max_posts_per_keyword=settings.linkedin_apify.max_posts_per_keyword,
+            max_total_leads=settings.scraping.max_total_leads,
+            rate_limit=10,  # 10 requests per minute
+            headless=True,
+            days_filter=settings.linkedin_apify.days_filter,
+            proxy=settings.linkedin_proxy if hasattr(settings, 'linkedin_proxy') else None
+        )
+        leads = await scraper.scrape()
+        print(f"✓ LinkedIn Playwright scraping complete: {len(leads)} leads found")
+        return leads
+    except Exception as e:
+        print(f"❌ LinkedIn Playwright scraping failed: {e}")
+        return []
+
+
 async def run_scrapers(sources: list[str]) -> list[Lead]:
     """Run specified scrapers concurrently."""
     tasks = []
@@ -193,6 +219,9 @@ async def run_scrapers(sources: list[str]) -> list[Lead]:
     
     if 'linkedin_apify' in sources:
         tasks.append(scrape_linkedin_apify())
+    
+    if 'linkedin_pw' in sources:
+        tasks.append(scrape_linkedin_playwright())
     
     if not tasks:
         print("No valid sources specified")
@@ -230,9 +259,9 @@ def main():
     parser.add_argument(
         '--sources',
         nargs='+',
-        choices=['reddit', 'discord', 'slack', 'linkedin', 'linkedin_public', 'linkedin_apify'],
+        choices=['reddit', 'discord', 'slack', 'linkedin', 'linkedin_public', 'linkedin_apify', 'linkedin_pw'],
         default=['reddit', 'discord', 'slack'],
-        help='Sources to scrape (linkedin=free public, linkedin_public=free, linkedin_apify=paid)'
+        help='Sources to scrape (linkedin=free public, linkedin_public=free, linkedin_apify=paid, linkedin_pw=playwright)'
     )
     parser.add_argument(
         '--service',
