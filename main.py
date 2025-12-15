@@ -12,6 +12,7 @@ from scrapers.discord_scraper import DiscordScraper
 from scrapers.slack_scraper import SlackScraper
 from scrapers.linkedin_public_scraper import LinkedInPublicScraper
 from scrapers.linkedin_pw_scraper import LinkedInPlaywrightScraper
+from scrapers.linkedin_sl_scraper import LinkedInSeleniumScraper
 from storage.json_handler import append_leads, save_leads
 from storage.excel_handler import export_to_excel
 from utils.linkedin_helpers import get_linkedin_user_agents
@@ -205,6 +206,68 @@ async def scrape_linkedin_playwright() -> list[Lead]:
         return []
 
 
+async def scrape_linkedin_selenium() -> list[Lead]:
+    """Scrape LinkedIn using Selenium WebDriver."""
+    if not settings.linkedin_cookie:
+        print("LinkedIn Selenium: Cookie not configured, skipping")
+        return []
+    
+    print("\n=== Starting LinkedIn Selenium Scraping ===")
+    # Get headless setting from command line args or default to False for debugging
+    headless_mode = getattr(main, '_headless_arg', False)
+    if not headless_mode:
+        print("  ℹ️  Running in VISIBLE mode for debugging. Use --headless to run hidden.")
+    try:
+        # Run synchronously (Selenium is not async)
+        scraper = LinkedInSeleniumScraper(
+            linkedin_cookie=settings.linkedin_cookie,
+            keywords=settings.scraping.keywords,
+            max_posts_per_keyword=settings.linkedin_apify.max_posts_per_keyword,
+            max_total_leads=settings.scraping.max_total_leads,
+            rate_limit=10,  # 10 requests per minute
+            headless=headless_mode,
+            days_filter=settings.linkedin_apify.days_filter,
+            proxy=settings.linkedin_proxy if hasattr(settings, 'linkedin_proxy') else None
+        )
+        leads = scraper.scrape()
+        print(f"✓ LinkedIn Selenium scraping complete: {len(leads)} leads found")
+        return leads
+    except Exception as e:
+        print(f"❌ LinkedIn Selenium scraping failed: {e}")
+        return []
+
+
+async def scrape_linkedin_selenium() -> list[Lead]:
+    """Scrape LinkedIn using Selenium WebDriver."""
+    if not settings.linkedin_cookie:
+        print("LinkedIn Selenium: Cookie not configured, skipping")
+        return []
+    
+    print("\n=== Starting LinkedIn Selenium Scraping ===")
+    # Get headless setting from command line args or default to False for debugging
+    headless_mode = getattr(main, '_headless_arg', False)
+    if not headless_mode:
+        print("  ℹ️  Running in VISIBLE mode for debugging. Use --headless to run hidden.")
+    try:
+        # Run synchronously (Selenium is not async)
+        scraper = LinkedInSeleniumScraper(
+            linkedin_cookie=settings.linkedin_cookie,
+            keywords=settings.scraping.keywords,
+            max_posts_per_keyword=settings.linkedin_apify.max_posts_per_keyword,
+            max_total_leads=settings.scraping.max_total_leads,
+            rate_limit=10,  # 10 requests per minute
+            headless=headless_mode,
+            days_filter=settings.linkedin_apify.days_filter,
+            proxy=settings.linkedin_proxy if hasattr(settings, 'linkedin_proxy') else None
+        )
+        leads = scraper.scrape()
+        print(f"✓ LinkedIn Selenium scraping complete: {len(leads)} leads found")
+        return leads
+    except Exception as e:
+        print(f"❌ LinkedIn Selenium scraping failed: {e}")
+        return []
+
+
 async def run_scrapers(sources: list[str]) -> list[Lead]:
     """Run specified scrapers concurrently."""
     tasks = []
@@ -226,6 +289,9 @@ async def run_scrapers(sources: list[str]) -> list[Lead]:
     
     if 'linkedin_pw' in sources:
         tasks.append(scrape_linkedin_playwright())
+    
+    if 'linkedin_selenium' in sources or 'linkedin_sl' in sources:
+        tasks.append(scrape_linkedin_selenium())
     
     if not tasks:
         print("No valid sources specified")
@@ -266,9 +332,9 @@ def main():
     parser.add_argument(
         '--sources',
         nargs='+',
-        choices=['reddit', 'discord', 'slack', 'linkedin', 'linkedin_public', 'linkedin_apify', 'linkedin_pw'],
+        choices=['reddit', 'discord', 'slack', 'linkedin', 'linkedin_public', 'linkedin_apify', 'linkedin_pw', 'linkedin_selenium', 'linkedin_sl'],
         default=['reddit', 'discord', 'slack'],
-        help='Sources to scrape (linkedin=free public, linkedin_public=free, linkedin_apify=paid, linkedin_pw=playwright)'
+        help='Sources to scrape (linkedin=free public, linkedin_public=free, linkedin_apify=paid, linkedin_pw=playwright, linkedin_selenium/linkedin_sl=selenium)'
     )
     parser.add_argument(
         '--service',
