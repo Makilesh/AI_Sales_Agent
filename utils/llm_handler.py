@@ -56,8 +56,39 @@ class LLMLeadQualifier:
         title = lead.title or ""
         full_text = f"{title}\n\n{content}" if title else content
 
-        # Service filter (if applicable)
-        service_filter = f"ONLY qualify {self.target_service} leads. " if self.target_service else ""
+        # Service filter (if applicable) - STRENGTHENED FOR STRICT FILTERING
+        service_filter = ""
+        if self.target_service:
+            if self.target_service.upper() == 'RWA':
+                service_filter = """**🚨 CRITICAL: ONLY QUALIFY RWA TOKENIZATION LEADS. REJECT ALL OTHER SERVICES.**
+
+**REQUIRED RWA KEYWORDS (must have at least one):**
+- "tokenize", "tokenization", "tokenizing"
+- "RWA", "real world asset", "real-world asset"
+- "fractional ownership", "fractionalize"
+- "security token", "STO", "asset-backed token"
+
+**REJECT IMMEDIATELY IF:**
+- Crypto/Web3 development (unless specifically about asset tokenization)
+- AI/ML services (not RWA)
+- General blockchain development (unless tokenization-related)
+- Smart contracts (unless for tokenization)
+- DeFi projects (unless RWA-focused)
+"""
+            elif self.target_service.upper() == 'CRYPTO':
+                service_filter = f"""**🚨 CRITICAL: ONLY QUALIFY CRYPTO/WEB3 LEADS. REJECT RWA/AI/OTHER SERVICES.**
+
+**MUST ask for:** Crypto development, Web3 integration, DeFi, cryptocurrency
+**REJECT:** RWA tokenization, AI/ML, general blockchain
+"""
+            elif 'AI' in self.target_service.upper() or 'ML' in self.target_service.upper():
+                service_filter = f"""**🚨 CRITICAL: ONLY QUALIFY AI/ML LEADS. REJECT CRYPTO/RWA/BLOCKCHAIN.**
+
+**MUST ask for:** AI automation, ML models, chatbots, AI integration
+**REJECT:** Crypto, blockchain, tokenization
+"""
+            else:
+                service_filter = f"🚨 CRITICAL: ONLY qualify {self.target_service} leads. REJECT all other services. "
 
         # Targeted search boost
         search_boost = ""
@@ -66,43 +97,129 @@ class LLMLeadQualifier:
 
         # Build service-specific context
         if self.target_service == 'RWA' or (service_filter and 'RWA' in service_filter):
-            service_context = """**Shamla Tech RWA Services:**
+            service_context = """**CRITICAL: RWA-ONLY MODE - Reject ALL non-RWA leads**
+
+**Shamla Tech RWA Services:**
 - Real estate tokenization (commercial/residential property fractionalization)
 - Asset tokenization platforms (art, commodities, securities)
 - Security Token Offerings (STO) infrastructure
 - Fractional ownership solutions
-- Compliant tokenization (SEC/regulatory)
+- Regulatory-compliant tokenization
 
-**ONLY qualify if:** Business/individual wants to TOKENIZE their assets or BUILD tokenization platform. NOT job posts, NOT offering services."""
+**STRICT RWA CRITERIA - MUST have ALL:**
+1. Someone has a PHYSICAL/FINANCIAL ASSET (property, art, commodity, securities)
+2. They want to TOKENIZE it or BUILD a tokenization platform
+3. Clear buyer intent ("I want to", "need help", "how to")
+
+**AUTOMATIC REJECT:**
+- AI/ML projects (not RWA)
+- Blockchain dev jobs (not asset tokenization)
+- Crypto payments/wallets (not asset tokenization)
+- Smart contracts UNLESS for asset tokenization
+- DeFi/Web3 UNLESS for RWA
+- [Hiring] or [For Hire] posts"""
+            rejection_rule = "\n**MANDATORY: If not about ASSET TOKENIZATION, set is_qualified=false with reason='Not RWA - [topic]' and service_match=[]"
         else:
             service_context = "**Services:** RWA Tokenization, Crypto/Web3, Blockchain, AI/ML"
+            rejection_rule = ""
 
         prompt = f"""Qualify lead for Shamla Tech (India-based Web3/RWA firm). {service_filter}{search_boost}
 
 **Lead:** {full_text}
 
-{service_context}
+{service_context}{rejection_rule}
 
-**Qualify if ANY:**
-1. EXPLICIT BUYER: "tokenize my/our [asset]", "need tokenization for", "looking for RWA platform"
-2. BUYING SIGNALS: Budget, timeline, "how much to tokenize", RFP, evaluation phase
-3. PROBLEM: "want to fractionalize", "enable fractional ownership", "compliant tokenization"
+**Qualify if ALL TRUE:**
+1. ASSET EXISTS: Property, real estate, securities, art, commodities, financial instrument
+2. TOKENIZATION INTENT: "tokenize", "fractional ownership", "STO", "asset-backed tokens"
+3. BUYER ROLE: Asset owner/business seeking service (NOT job seeker, NOT service provider)
 
-**REJECT:**
-- Job posts: "[Hiring]", "we are hiring", "apply now"
-- Service providers: "[For Hire]", "I offer", "my services"
-- Discussions/news: No clear business need
-- Wrong industry: Software jobs, marketing, design (unless blockchain-related)
+**Examples of QUALIFIED RWA leads:**
+- "I own a commercial property and want to tokenize it for fractional ownership"
+- "Looking for a platform to tokenize our art collection"
+- "Need help with security token offering for our real estate fund"
+- "How to tokenize commodities for our trading platform?"
+
+**Examples of REJECTED (not RWA):**
+- "[Hiring] Blockchain developer" → Job post
+- "[For Hire] Smart contract developer" → Service provider
+- "Need AI automation" → Wrong service (AI not RWA)
+- "Building a DeFi protocol" → DeFi not asset tokenization
+- "Cross-chain ZK proofs" → Blockchain tech not RWA
 
 **Confidence:**
-- 0.85-1.0: "I want to tokenize [my asset]" with specifics
-- 0.7-0.85: "How to tokenize" + business context (budget/timeline/company mentioned)
-- 0.5-0.7: Implicit need (fractional ownership interest + asset type)
-- 0.0-0.5: Reject (no clear buyer intent)
+- 0.85-1.0: "Tokenize MY [specific asset]" with asset type named
+- 0.7-0.85: "How to tokenize [asset type]" + business context
+- 0.5-0.7: Implicit RWA need (fractional ownership + real asset mentioned)
+- 0.0-0.5: Reject (no asset tokenization intent)
 
-JSON: {{"is_qualified": true/false, "confidence_score": 0.0-1.0, "reason": "quoted phrase showing buyer intent", "service_match": ["RWA Tokenization"]}}"""
+JSON: {{"is_qualified": true/false, "confidence_score": 0.0-1.0, "reason": "[ACCEPT: asset type + tokenization intent] OR [REJECT: not RWA - topic]", "service_match": ["RWA Tokenization"]}}"""
 
         return prompt
+    
+    def _validate_service_match(self, result: dict, lead: Lead) -> dict:
+        """
+        Validate that LLM-qualified lead actually matches target service.
+        Overrides LLM decision if service mismatch detected.
+        
+        This is a CRITICAL VALIDATION LAYER that catches false positives from the LLM.
+        
+        Args:
+            result: LLM qualification result
+            lead: Original lead object
+            
+        Returns:
+            dict: Modified result with corrected qualification if needed
+        """
+        if not self.target_service or not result.get('is_qualified'):
+            return result
+        
+        service_match = result.get('service_match', [])
+        
+        # Check if target service is in the matched services
+        if self.target_service.upper() == 'RWA':
+            # For RWA, require "RWA", "tokenization", or "tokenize" in service match
+            rwa_keywords = ['rwa', 'tokenization', 'tokenize', 'asset tokenization', 'real world']
+            has_rwa = any(
+                any(keyword in service.lower() for keyword in rwa_keywords)
+                for service in service_match
+            )
+            
+            if not has_rwa:
+                # LLM qualified wrong service - override
+                print(f"  🚫 VALIDATION OVERRIDE: LLM found {service_match} but filtering for RWA only")
+                result['is_qualified'] = False
+                result['confidence_score'] = 0.0
+                result['reason'] = f"Service mismatch: LLM found {service_match} but filtering for RWA tokenization only"
+                result['service_match'] = []
+        
+        elif self.target_service.upper() == 'CRYPTO':
+            crypto_keywords = ['crypto', 'web3', 'defi', 'cryptocurrency', 'blockchain']
+            has_crypto = any(
+                any(keyword in service.lower() for keyword in crypto_keywords)
+                for service in service_match
+            )
+            if not has_crypto:
+                print(f"  🚫 VALIDATION OVERRIDE: LLM found {service_match} but filtering for Crypto only")
+                result['is_qualified'] = False
+                result['confidence_score'] = 0.0
+                result['reason'] = f"Service mismatch: filtering for Crypto only"
+                result['service_match'] = []
+        
+        elif 'AI' in self.target_service.upper() or 'ML' in self.target_service.upper():
+            ai_keywords = ['ai', 'ml', 'machine learning', 'artificial intelligence', 'chatbot']
+            has_ai = any(
+                any(keyword in service.lower() for keyword in ai_keywords)
+                for service in service_match
+            )
+            if not has_ai:
+                print(f"  🚫 VALIDATION OVERRIDE: LLM found {service_match} but filtering for AI/ML only")
+                result['is_qualified'] = False
+                result['confidence_score'] = 0.0
+                result['reason'] = f"Service mismatch: filtering for AI/ML only"
+                result['service_match'] = []
+        
+        return result
     
     def _should_send_to_llm(self, lead: Lead) -> tuple[bool, str]:
         """
@@ -263,6 +380,10 @@ JSON: {{"is_qualified": true/false, "confidence_score": 0.0-1.0, "reason": "quot
             # Add note that Gemini was used
             result["llm_provider"] = "gemini"
             
+            # 🔍 CRITICAL: Validate service match using robust validation method
+            if self.target_service and result["is_qualified"]:
+                result = self._validate_service_match(result, lead)
+            
             return result
             
         except json.JSONDecodeError as e:
@@ -293,7 +414,28 @@ JSON: {{"is_qualified": true/false, "confidence_score": 0.0-1.0, "reason": "quot
 
         # Process in batches of batch_size
         for i in range(0, len(leads), batch_size):
-            batch_leads = leads[i:i+batch_size]
+            batch_leads_raw = leads[i:i+batch_size]
+            
+            # 🔍 CRITICAL: Apply pre-filter to remove obvious non-inquiries
+            batch_leads = []
+            for lead in batch_leads_raw:
+                should_send, block_reason = self._should_send_to_llm(lead)
+                if should_send:
+                    batch_leads.append(lead)
+                else:
+                    # Add pre-filtered result
+                    all_results.append({
+                        "is_qualified": False,
+                        "confidence_score": 0.0,
+                        "reason": f"Pre-filter blocked: {block_reason}",
+                        "service_match": [],
+                        "skipped_llm": True,
+                        "llm_provider": "none"
+                    })
+            
+            # Skip batch if all leads were pre-filtered
+            if not batch_leads:
+                continue
 
             # Build batch prompt
             batch_prompt = self._build_batch_qualification_prompt(batch_leads)
@@ -351,9 +493,23 @@ JSON: {{"is_qualified": true/false, "confidence_score": 0.0-1.0, "reason": "quot
                             "error": "Batch response incomplete"
                         })
 
-                # Add LLM provider marker
-                for result in batch_results:
+                # Add LLM provider marker and apply robust service validation
+                for idx, result in enumerate(batch_results):
                     result['llm_provider'] = 'openai'
+                    
+                    # 🔍 CRITICAL: Apply robust service validation
+                    if self.target_service and result.get("is_qualified"):
+                        # Get corresponding lead from batch
+                        if idx < len(batch_leads):
+                            lead_num = i + idx + 1  # i is the batch offset
+                            print(f"  🔍 [Lead #{lead_num}] Service filter: {self.target_service}, LLM matched: {result.get('service_match', [])}")
+                            result = self._validate_service_match(result, batch_leads[idx])
+                            if result["is_qualified"]:
+                                print(f"  ✅ [Lead #{lead_num}] Validation PASSED")
+                            else:
+                                print(f"  ❌ [Lead #{lead_num}] Validation FAILED - rejected")
+                            # Update the result in the list
+                            batch_results[idx] = result
 
                 all_results.extend(batch_results)
 
@@ -496,6 +652,17 @@ Return exactly {len(leads)} results in order."""
             
             # Mark that OpenAI was used
             result["llm_provider"] = "openai"
+            
+            # 🔍 CRITICAL: Validate service match - catches false positives
+            # This robust validation layer overrides LLM if service mismatch detected
+            if self.target_service and result["is_qualified"]:
+                print(f"  🔍 Service filter active: {self.target_service}")
+                print(f"  📋 LLM matched services: {result.get('service_match', [])}")
+                result = self._validate_service_match(result, lead)
+                if result["is_qualified"]:
+                    print(f"  ✅ Service validation PASSED")
+                else:
+                    print(f"  ❌ Service validation FAILED - lead rejected")
             
             return result
             

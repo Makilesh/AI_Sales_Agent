@@ -176,16 +176,21 @@ class ScrapingConfig:
         ],
         
         # ============================================================
-        # 2. RWA TOKENIZATION (cross-platform) - BUYER-FOCUSED
+        # 2. RWA TOKENIZATION - BUYER-FOCUSED (Asset owners seeking tokenization)
         # ============================================================
         'rwa': [
-            "tokenization consultant", "RWA developer",
-            "asset tokenization", "real estate tokenization",
-            "tokenization platform", "fractional ownership",
-            "security token offering", "STO platform",
-            "tokenize real estate", "tokenization project",
-            "tokenization service", "blockchain tokenization",
-            "looking for RWA", "need tokenization", "hiring tokenization"
+            # EXPLICIT ASSET OWNER INTENT
+            "tokenize my property", "tokenize our assets", "tokenize my real estate",
+            "fractional ownership for my", "fractionalize my property",
+            
+            # PROBLEM/SOLUTION SEEKING
+            "how to tokenize real estate", "how to tokenize assets",
+            "need asset tokenization", "looking for tokenization platform",
+            "security token offering help", "STO consultant",
+            
+            # INDUSTRY-SPECIFIC BUYER SIGNALS
+            "property tokenization service", "real estate fractionalization",
+            "tokenization for commercial property", "blockchain for real estate investment"
         ],
         
         # ============================================================
