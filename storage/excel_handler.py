@@ -214,42 +214,6 @@ def export_qualified_only(
     export_to_excel(list(qualified_leads), list(qualified_quals), filename)
 
 
-def export_by_service(
-    leads: list[Lead],
-    qualifications: list[dict],
-    service: str,
-    filename: str,
-    min_confidence: float = 0.0
-) -> None:
-    """
-    Export leads matching specific service to Excel.
-    
-    Args:
-        leads: List of Lead objects
-        qualifications: List of qualification dicts (must match leads order)
-        service: Service to filter by ('RWA', 'Crypto/Blockchain', 'AI/ML')
-        filename: Output Excel file path
-        min_confidence: Minimum confidence score to include (default: 0.0)
-    """
-    # Filter to specific service
-    filtered = [
-        (lead, qual)
-        for lead, qual in zip(leads, qualifications)
-        if qual.get('is_qualified', False)
-        and service in qual.get('service_match', [])
-        and qual.get('confidence_score', 0.0) >= min_confidence
-    ]
-    
-    if not filtered:
-        print(f"⚠️  No qualified leads found for service '{service}' with confidence >= {min_confidence}")
-        return
-    
-    service_leads, service_quals = zip(*filtered)
-    
-    print(f"📊 Exporting {len(service_leads)} {service} leads (confidence >= {min_confidence})...")
-    export_to_excel(list(service_leads), list(service_quals), filename)
-
-
 def export_all_leads_to_excel(leads: list[Lead], filename: str) -> None:
     """
     Export ALL leads (qualified + unqualified) to Excel.

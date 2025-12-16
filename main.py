@@ -340,22 +340,16 @@ def main():
         '--service',
         type=str,
         choices=[
-            # Platform-specific presets (optimized for Reddit or LinkedIn)
-            'rwa_reddit', 'rwa_linkedin', 
-            'crypto_reddit', 'crypto_linkedin',
-            'ai_reddit', 'ai_linkedin',
-            'blockchain_reddit', 'blockchain_linkedin',
-            # Competitor frustration presets
-            'competitor_frustration_reddit', 'competitor_frustration_linkedin',
-            # Universal presets (work on both platforms)
-            'rwa', 'crypto', 'ai', 'blockchain', 'general', 'all'
+            # OPTIMIZED: Cross-platform presets (8 total, no platform variants)
+            'competitor_frustration', 'rwa', 'crypto', 'ai',
+            'blockchain', 'web3', 'defi', 'smart_contracts'
         ],
-        help='Service inquiry type. Platform-specific: rwa_reddit, rwa_linkedin, etc. Competitor frustration: competitor_frustration_reddit/linkedin. Universal: rwa, crypto, ai, blockchain, general, all'
+        help='OPTIMIZED: Service inquiry type (cross-platform). Options: competitor_frustration, rwa, crypto, ai, blockchain, web3, defi, smart_contracts'
     )
     parser.add_argument(
         '--max-total-leads',
         type=int,
-        help='Global limit - stop after this many leads (default: 200)'
+        help='Global limit - stop after this many leads (default: 500, optimized from 200)'
     )
     parser.add_argument(
         '--output',
@@ -382,20 +376,20 @@ def main():
     parser.add_argument(
         '--min-confidence',
         type=float,
-        default=0.6,
-        help='Minimum confidence score for qualified leads (0.0-1.0, default: 0.6). Leads below this are filtered out.'
+        default=0.65,
+        help='OPTIMIZED: Minimum confidence score for qualified leads (0.0-1.0, default: 0.65, increased from 0.6). Leads below this are filtered out.'
     )
     parser.add_argument(
         '--batch-size',
         type=int,
-        default=50,
-        help='Process leads in batches of N (default: 50). Enables progressive saving and cost tracking.'
+        default=100,
+        help='OPTIMIZED: Process leads in batches of N (default: 100, increased from 50). Enables progressive saving and cost tracking.'
     )
     parser.add_argument(
         '--llm-batch-size',
         type=int,
-        default=10,
-        help='Number of leads to send to LLM in single API call (default: 10). Higher = better consistency, lower cost.'
+        default=20,
+        help='OPTIMIZED: Number of leads to send to LLM in single API call (default: 20, increased from 10). Higher = better consistency, lower cost.'
     )
     parser.add_argument(
         '--headless',

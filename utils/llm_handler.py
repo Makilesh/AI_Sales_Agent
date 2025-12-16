@@ -50,480 +50,78 @@ class LLMLeadQualifier:
                 self.gemini_model = None
     
     def _build_qualification_prompt(self, lead: Lead) -> str:
-        """Build strict qualification prompt - only accept explicit service requests."""
-        content = lead.content[:2000]
+        """Lean qualification prompt - 300 tokens max, no examples."""
+        # OPTIMIZED: Use first 300 chars only (vs 2000 before)
+        content = lead.content[:300]
         title = lead.title or ""
         full_text = f"{title}\n\n{content}" if title else content
-        
-        # Service-specific filtering instructions
-        service_focus = ""
-        if self.target_service:
-            service_focus = f"""
-**🎯 MANDATORY FILTER: {self.target_service.upper()} SERVICE ONLY**
 
-You MUST ONLY qualify leads asking for {self.target_service} service specifically.
-- If asking for {self.target_service}: Check if qualified using rules below
-- If asking for OTHER services: Automatically set is_qualified=false, confidence=0.0
-- If unclear which service: Set confidence=0.3 max
+        # Service filter (if applicable)
+        service_filter = f"ONLY qualify {self.target_service} leads. " if self.target_service else ""
 
-REJECT leads about other services even if they're high-quality inquiries.
-"""
-        
-        # Competitor detection
-        competitor_context = self._detect_competitor_mentions(full_text)
-
-        # IMPROVED (ISSUE #1): Reddit metadata boost for targeted search leads
-        reddit_boost_context = ""
+        # Targeted search boost
+        search_boost = ""
         if lead.source == 'reddit' and lead.metadata.get('targeted_search'):
-            search_phrase = lead.metadata.get('search_phrase', 'unknown')
-            reddit_boost_context = f"""🎯 **HIGH-INTENT SEARCH LEAD:**
-This lead was found via targeted Reddit search for: "{search_phrase}"
-This indicates ACTIVE service-seeking behavior (not just browsing subreddit).
+            search_boost = f"🎯 High-intent search lead (phrase: '{lead.metadata.get('search_phrase', '')}'). +0.15 confidence if qualified. "
 
-**QUALIFICATION BOOST:** Increase confidence by +0.15 if this is a genuine service inquiry.
-Search-targeted leads have 3x higher conversion rates than general subreddit posts.
-"""
+        prompt = f"""Qualify lead for Shamla Tech (Web3/RWA/Blockchain/AI firm). {service_filter}{search_boost}
 
-        prompt = f"""You are qualifying sales leads for Shamla Tech (India-based Web3/RWA tokenization firm). Qualify leads showing clear service-seeking intent (explicit OR implicit).
+**Lead:** {full_text}
 
-**OUR SERVICES (Shamla Tech):**
-- RWA Tokenization: Tokenizing real-world assets on blockchain
-- Crypto/Web3: DeFi, Web3 apps, smart contracts, crypto integration
-- Blockchain: Custom blockchain, distributed ledger, consensus
-- AI/ML: AI automation, ML models, chatbots, neural networks
+**Services:** RWA Tokenization, Crypto/Web3, Blockchain, AI/ML
 
-**OUR DIRECT COMPETITORS (India-based Web3/Blockchain firms):**
-- Antier Solutions, Accubits Technologies, Somish Blockchain Labs
-- LeewayHertz, Primafelicitas, SoluLab, IdeaUsher, Tech Alchemy, Codezeros
-- NetSet Software, Nadcab Labs, Dev Technosys, RedDuck, Quytech
+**Qualify if ANY:**
+1. EXPLICIT: "looking for", "need help", "recommend", "seeking", "[hiring]", "best [tool] for"
+2. BUYING SIGNALS: Budget mentions, urgency (ASAP), timeline, RFP, contract terms
+3. IMPLICIT: Problem + context (budget/timeline/team lack expertise)
 
-{competitor_context}
+**Confidence:**
+- 0.8-1.0: Explicit help-seeking or strong buying signals
+- 0.6-0.75: Implicit (how-to + budget/timeline, evaluation language)
+- 0.5-0.6: Weak context signals
+- 0.0-0.3: Discussion, news, self-promotion (reject)
 
-{reddit_boost_context}
+**Reject:** Pure learning, opinions, announcements, spam (no business context)
 
-{service_focus}
+JSON: {{"is_qualified": true/false, "confidence_score": 0.0-1.0, "reason": "quoted phrase or why not", "service_match": ["RWA Tokenization"]}}"""
 
-**Lead Content:**
-{full_text}
-
-**QUALIFICATION RULES:**
-
-✅ HIGH CONFIDENCE (0.8-1.0) - QUALIFY IF ANY:
-
-**Option 1: EXPLICIT HELP-SEEKING**
-Contains help-seeking phrase + describes relevant need:
-   • "looking for [service/consultant/agency/solution/platform]"
-   • "need help [with/implementing/building]"
-   • "recommend a [service/tool/platform/consultant]"
-   • "anyone know [a good/any/where to find]"
-   • "seeking [expert/consultant/developer/agency]"
-   • "can someone help me [with/find]"
-   • "suggestions for [service/platform/tool]"
-   • "best [platform/service/tool] for"
-   • "who can help [me/us] with"
-   • "where can I find [service/consultant]"
-
-**Option 2: STRONG BUYING SIGNALS** (Reddit-specific)
-   • [Hiring] or [Task] tags in post title
-   • Budget mentions: "Budget: $50k", "willing to pay $X"
-   • Urgency: "ASAP", "urgent", "immediately need"
-   • Timeline: "deadline:", "by Q1", "start date"
-   • Formal RFP: "request for proposal", "seeking proposals"
-   • Contract language: "/month", "/hour", "contract for"
-
-**Option 3: IMPLICIT SERVICE NEED** (Problem + Context)
-   • "How do I/we [task]" + business context (budget/timeline/team)
-   • States problem/challenge + mentions budget/timeline
-   • "Struggling with X" + shows business context
-   • "Our project needs X" + implies external help
-   • Technical problem + team lacks expertise
-   • Evaluation language: "considering", "exploring", "evaluating" + specific tech
-
-Examples QUALIFIED:
-✓ "Looking for a blockchain consultant to help tokenize our real estate portfolio"
-✓ "[Hiring] RWA developer. Budget $40k. Start ASAP."
-✓ "Need help implementing DeFi protocol, any recommendations?"
-✓ "Struggling with tokenization. Budget: $50k, timeline: Q1"
-✓ "Our RWA project is stuck. Team doesn't have blockchain expertise."
-✓ "Best service for tokenizing real estate assets?"
-✓ "How do I tokenize real estate? Budget: $50k, need by Q1" (implicit + context)
-✓ "Exploring RWA platforms for our fund. Timeline: 3 months" (evaluation + timeline)
-✓ "What's the best way to tokenize properties? Team has no blockchain experience" (question + context)
-
-✅ **PRIORITY LEADS - Competitor Frustration:**
-✓ "Antier Solutions too expensive, need cheaper RWA tokenization alternative"
-✓ "LeewayHertz delayed our project 3 months, looking for reliable blockchain consultant"
-✓ "Disappointed with Accubits, anyone know better Web3 agency?"
-✓ "Alternative to SoluLab? Their tokenization platform not working"
-✓ "Need to replace our current Web3 vendor (Primafelicitas), recommendations?"
-✓ "Switching from Codezeros - too slow, need responsive blockchain developer"
-
-**These get +0.2 confidence boost** as they're actively seeking to change providers!
-
-⚠️ MODERATE (0.5-0.75) - QUALIFY WITH LOWER CONFIDENCE:
-- "How to" questions + business context (budget/timeline/team) → 0.6-0.7
-- Problem statement + budget/timeline mentioned → 0.65
-- Evaluation: "considering", "exploring", "evaluating" + specific tech → 0.6
-- Discusses challenges + mentions business context → 0.55
-- "Any advice/tips" + shows business context → 0.5
-
-Examples MODERATE (still qualify, just lower confidence):
-≈ "How to tokenize real estate? Budget: $50k" → 0.65 (how-to + budget = qualify)
-≈ "Exploring RWA platforms for our fund" → 0.6 (evaluation = buyer intent)
-≈ "Our team is considering tokenization. Timeline: Q1" → 0.6 (evaluation + timeline)
-≈ "Tokenization seems complex. Budget considerations?" → 0.55 (shows business thinking)
-≈ "Any advice on tokenizing assets? Our team stuck" → 0.5 (advice + team context)
-
-❌ LOW (0.0-0.3) - DO NOT QUALIFY:
-- Pure discussion/learning (no business context)
-- Sharing news, articles, opinions
-- Self-promotion of their product/service
-- Explaining concepts to others
-- General curiosity questions
-- Announcements/launches
-
-Examples NOT QUALIFIED:
-✗ "RWA tokenization is revolutionizing real estate" → opinion/discussion
-✗ "Just learned about blockchain, so cool!" → learning/excitement
-✗ "Our new RWA platform just launched, check it out!" → self-promotion
-✗ "How does tokenization work? ELI5" → pure education, no business context
-✗ "Tokenization could transform investing" → speculation/opinion
-✗ "Excited to announce our blockchain solution!" → announcement
-
-**CRITICAL RULES:**
-1. Qualify if EXPLICIT help-seeking OR strong buying signal OR implicit need with business context
-2. "How to" questions + business context (budget/timeline/team) = QUALIFY at 0.6-0.7 confidence
-3. Evaluation language ("considering", "exploring", "evaluating") + specific tech = QUALIFY at 0.6
-4. Buying signals ([Hiring], Budget, ASAP, RFP) = automatic high confidence qualification
-5. Problem + business context (budget/timeline/team) = qualified at 0.65
-6. Pure discussion/learning WITHOUT any business context = not qualified
-7. Quote the specific phrase or signal found in your reason
-
-Response JSON (no markdown):
-{{
-  "is_qualified": true/false,
-  "confidence_score": 0.0-1.0,
-  "reason": "Quote specific help-seeking phrase found, or explain why not qualified (1-2 sentences)",
-  "service_match": ["RWA Tokenization"] or ["Crypto/Web3"] or ["Blockchain"] or ["AI/ML"] or []
-}}"""
-        
         return prompt
     
-    def _detect_competitor_mentions(self, text: str) -> str:
+    def _should_send_to_llm(self, lead: Lead) -> tuple[bool, str]:
         """
-        Detect mentions of direct competitors and frustration signals.
-        
-        Returns:
-            str: Context string for LLM about competitor mentions (empty if none)
-        """
-        if not text:
-            return ""
-        
-        text_lower = text.lower()
-        
-        # Shamla Tech competitors
-        competitors = [
-            "antier", "antier solutions",
-            "accubits", "accubits technologies",
-            "somish", "somish blockchain",
-            "leewayhertz", "leeway hertz",
-            "primafelicitas",
-            "solulab",
-            "ideausher",
-            "tech alchemy",
-            "codezeros",
-            "netset", "netset software",
-            "nadcab", "nadcab labs",
-            "dev technosys",
-            "redduck",
-            "quytech",
-            "owebest",
-            "taksh it"
-        ]
-        
-        # Find mentioned competitors
-        mentioned = [comp for comp in competitors if comp in text_lower]
-        
-        if not mentioned:
-            return ""
-        
-        # Check for frustration signals
-        frustration_signals = [
-            "expensive", "overpriced", "too much", "costly",
-            "slow", "delay", "delayed", "late", "unresponsive",
-            "problem", "issue", "trouble", "struggling",
-            "disappointed", "frustrated", "unhappy", "dissatisfied",
-            "not working", "doesn't work", "failed",
-            "alternative to", "better than", "cheaper than",
-            "replace", "switch from", "looking for new",
-            "need new", "change provider", "vendor change"
-        ]
-        
-        has_frustration = any(signal in text_lower for signal in frustration_signals)
-        
-        if has_frustration:
-            competitor_names = ", ".join(mentioned)
-            return f"""🎯 **HIGH-PRIORITY LEAD DETECTED:**
-This lead mentions competitor(s): {competitor_names}
-AND shows frustration/dissatisfaction signals.
+        CONSOLIDATED pre-filter. Single decisive check.
 
-**QUALIFICATION BOOST:** Increase confidence by +0.2 if this is a genuine service inquiry.
-They are actively looking for alternatives to their current provider - prime conversion opportunity!
-"""
-        else:
-            # Just mentions competitor without frustration
-            competitor_names = ", ".join(mentioned)
-            return f"ℹ️ Note: Lead mentions competitor: {competitor_names} (no frustration signals detected)"
-    
-    def _contains_help_seeking_phrase(self, text: str) -> tuple[bool, str]:
-        """
-        Check if text contains help-seeking phrases that indicate service inquiry.
-        
-        Uses FLEXIBLE patterns for Reddit/casual platforms (includes imperative forms).
-        
         Returns:
-            tuple: (has_phrase: bool, matched_phrase: str)
+            tuple: (should_send: bool, reason: str)
+                - True: MIGHT be inquiry → send to LLM
+                - False: DEFINITELY not inquiry → skip LLM (with reason)
         """
-        if not text:
-            return False, ""
-        
-        text_lower = text.lower()
-        
-        # FLEXIBLE help-seeking patterns (Reddit/casual appropriate)
-        help_patterns = [
-            # Direct requests (with or without "I/we")
-            ("looking for", "looking for"),
-            ("need advice", "need advice"),
-            ("need help", "need help"),
-            ("need guidance", "need guidance"),
-            ("need suggestions", "need suggestions"),
-            ("need recommendations", "need recommendations"),
-            ("seeking advice", "seeking advice"),
-            ("seeking help", "seeking help"),
-            ("seeking recommendations", "seeking recommendations"),
-            
-            # Question forms (common on Reddit)
-            ("any advice", "any advice"),
-            ("any suggestions", "any suggestions"),
-            ("any recommendations", "any recommendations"),
-            ("anyone recommend", "anyone recommend"),
-            ("anyone suggest", "anyone suggest"),
-            ("anyone know", "anyone know"),
-            ("does anyone", "does anyone"),
-            ("can someone", "can someone"),
-            ("who can help", "who can help"),
-            ("where can i", "where can i"),
-            ("how do i", "how do i"),
-            ("what should i", "what should i"),
-            
-            # Imperative/casual (Reddit style)
-            ("help me", "help me"),
-            ("help needed", "help needed"),
-            ("advice needed", "advice needed"),
-            ("recommendations needed", "recommendations needed"),
-            ("suggestions welcome", "suggestions welcome"),
-            
-            # Evaluation phrases
-            ("looking to hire", "looking to hire"),
-            ("considering", "considering"),
-            ("evaluating", "evaluating"),
-            ("exploring options", "exploring options"),
-            
-            # Which/best questions (buying signals)
-            ("which is best", "which is best"),
-            ("what's the best", "what's the best"),
-            ("whats the best", "whats the best"),
-            ("best way to", "best way to"),
-            ("best solution", "best solution"),
-            ("best platform", "best platform")
-        ]
-        
-        for pattern, match_name in help_patterns:
-            if pattern in text_lower:
-                return True, match_name
-        
-        return False, ""
-    
-    def _is_obvious_non_inquiry(self, text: str) -> bool:
-        """
-        Quick filter for obvious spam/promotion/news that should never qualify.
-        Only rejects OBVIOUS non-inquiries to reduce false negatives.
-        
-        Returns True if content is definitely not an inquiry.
-        """
-        if not text:
-            return True
-        
-        text_lower = text.lower()
-        
-        # Obvious spam/promotion indicators
-        spam_indicators = [
-            "check out our", "our platform offers", "we provide services",
-            "proud to announce", "join our webinar", "register now",
-            "click here", "buy now", "limited time offer",
+        content = lead.content
+        title = lead.title or ""
+        full_text = f"{title} {content}".lower()
+
+        # BLOCK 1: Obvious spam/self-promotion (multiple indicators required)
+        spam_phrases = [
+            "check out our", "proud to announce", "just launched",
+            "join our", "register now", "click here", "buy now",
             "visit our website", "dm for more", "link in bio"
         ]
-        
-        # Obvious job postings (hiring, not seeking service)
-        hiring_indicators = [
-            "we are hiring", "we're hiring", "job opening",
-            "apply now", "submit your resume", "send cv to",
-            "position available", "now accepting applications"
+        spam_count = sum(1 for phrase in spam_phrases if phrase in full_text)
+        if spam_count >= 2:
+            return False, "spam/self-promotion (2+ indicators)"
+
+        # BLOCK 2: Job postings (company hiring, not seeking service)
+        hiring_phrases = [
+            "we are hiring", "we're hiring", "apply now",
+            "submit your resume", "send cv to", "years experience required"
         ]
-        
-        # Check for multiple spam indicators
-        spam_count = sum(1 for indicator in spam_indicators if indicator in text_lower)
-        hiring_count = sum(1 for indicator in hiring_indicators if indicator in text_lower)
-        
-        # If multiple spam/hiring indicators, definitely not inquiry
-        if spam_count >= 2 or hiring_count >= 2:
-            return True
-        
-        return False
-    
-    def _detect_reddit_buying_signals(self, text: str) -> tuple[bool, str]:
-        """
-        Detect Reddit-specific buying signals that indicate high-intent leads.
+        hiring_count = sum(1 for phrase in hiring_phrases if phrase in full_text)
+        if hiring_count >= 2:
+            return False, "job posting (company hiring)"
 
-        Examples:
-        - "[Hiring] Blockchain developer" - Job posting tag
-        - "Budget: $50k" - Clear budget mention
-        - "Need this ASAP" - Urgency signal
-        - "RFP for tokenization services" - Formal request
-
-        Returns:
-            tuple: (has_signal: bool, signal_type: str)
-        """
-        if not text:
-            return False, ""
-
-        text_lower = text.lower()
-
-        # HIGH-INTENT BUYING SIGNALS (any single one is strong)
-
-        # Hiring/job tags (Reddit style)
-        if any(tag in text for tag in ["[hiring]", "[for hire]", "[task]"]):
-            return True, "hiring_tag"
-
-        # Budget mentions (clear buying intent)
-        if any(signal in text_lower for signal in ["budget:", "budget of", "budget is", "budget $", "budget for"]):
-            return True, "budget_mention"
-
-        # Price/cost discussions
-        if any(signal in text_lower for signal in ["willing to pay", "can pay", "paying $", "price range", "cost estimate"]):
-            return True, "pricing_discussion"
-
-        # Urgency markers
-        if any(signal in text_lower for signal in ["asap", "urgent", "urgently need", "immediately", "right away", "time sensitive"]):
-            return True, "urgency_signal"
-
-        # Formal requests
-        if any(signal in text_lower for signal in ["rfp", "request for proposal", "seeking proposals", "accepting bids"]):
-            return True, "formal_rfp"
-
-        # Timeline mentions (project planning)
-        if any(signal in text_lower for signal in ["timeline:", "deadline:", "start date", "by q1", "by q2", "within weeks"]):
-            return True, "timeline_mention"
-
-        # Contract/engagement language
-        if any(signal in text_lower for signal in ["contract for", "engagement for", "project duration", "/month", "/hour"]):
-            return True, "contract_language"
-
-        return False, ""
-
-    def _has_implicit_inquiry_signals(self, text: str) -> bool:
-        """
-        Check for implicit signals that suggest service inquiry without explicit help phrases.
-
-        Examples of implicit inquiries:
-        - "Struggling with tokenization implementation"
-        - "Our RWA platform needs smart contract integration"
-        - "Real estate tokenization budget: $50k"
-        - "Anyone experienced with asset tokenization?"
-
-        Returns True if content has inquiry signals worth LLM evaluation.
-        """
-        if not text:
-            return False
-
-        text_lower = text.lower()
-
-        # IMPROVED: Check Reddit buying signals first (single signal is enough)
-        has_buying_signal, _ = self._detect_reddit_buying_signals(text)
-        if has_buying_signal:
-            return True  # Single strong buying signal is enough
-
-        # Implicit inquiry signals (still require 2+ for weak signals)
-        inquiry_signals = [
-            # Problem statements (often lead to service requests)
-            "struggling with", "having trouble", "can't figure out",
-            "issues with", "problems with", "challenge with",
-            "difficulty with", "stuck on", "blocked by",
-
-            # Evaluation/consideration phrases
-            "considering hiring", "thinking about", "planning to",
-
-            # Question forms that imply seeking solution
-            "has anyone", "anyone experienced", "anyone here",
-            "anyone tried", "anyone worked with",
-
-            # Resource/tool seeking (implicit help)
-            "what tool", "which platform", "which service",
-            "recommend", "suggestion", "advice",
-            
-            # Business need statements
-            "we need", "i need", "our company needs",
-            "our project requires", "requirement for",
-            "must have", "essential to have"
-        ]
-        
-        # Count signals
-        signal_count = sum(1 for signal in inquiry_signals if signal in text_lower)
-        
-        # If 2+ signals, worth sending to LLM
-        return signal_count >= 2
-    
-    def _is_service_inquiry(self, text: str) -> bool:
-        """
-        Validate that content is truly a service inquiry (not news/discussion/promotion).
-        
-        Returns True only if:
-        1. Contains help-seeking phrase
-        2. Does NOT contain anti-patterns (news, self-promotion, education)
-        """
-        if not text:
-            return False
-        
-        text_lower = text.lower()
-        
-        # Check for help-seeking phrase first
-        has_help_phrase, _ = self._contains_help_seeking_phrase(text)
-        if not has_help_phrase:
-            return False
-        
-        # Anti-patterns that disqualify even if help phrase found
-        # ONLY block obvious spam/promotion/hiring, not legitimate inquiries
-        anti_patterns = [
-            # Self-promotion (clear spam)
-            "check out our", "our platform offers", 
-            "we provide services", "proud to announce",
-            "join our webinar", "register now",
-            
-            # Job postings (hiring language)
-            "we are hiring", "we're hiring", "job opening",
-            "apply now", "submit your resume", "send cv",
-            "job title:", "position:", "salary:", "duration:",
-            "experience:", "years experience", "yrs exp",
-            "location:", "contract position", "full-time",
-            "part-time", "freelance opportunity"
-        ]
-        
-        # If contains anti-pattern, it's likely not a genuine inquiry
-        for pattern in anti_patterns:
-            if pattern in text_lower:
-                return False
-        
-        return True
+        # ALLOW: Everything else goes to LLM
+        # Let LLM decide on borderline cases instead of aggressive pre-filtering
+        return True, ""
     
     def _call_gemini(self, prompt: str, lead: Lead = None) -> dict:
         """
@@ -751,158 +349,46 @@ They are actively looking for alternatives to their current provider - prime con
 
         return all_results
 
-    def _extract_smart_content(self, content: str, max_chars: int = 500) -> str:
-        """
-        Smart content extraction that prioritizes buying signals over blind truncation.
-
-        Strategy:
-        1. Extract buying signal snippets (budget, timeline, urgency)
-        2. Take first 300 chars for context
-        3. If space remains, take last 100 chars (often contains CTAs/budgets)
-        4. Total: ~500 chars with maximum signal density
-
-        Args:
-            content: Full lead content
-            max_chars: Maximum characters to extract (default: 500)
-
-        Returns:
-            Smartly extracted content with buying signals prioritized
-        """
-        if len(content) <= max_chars:
-            return content
-
-        # Extract buying signal snippets
-        signal_snippets = []
-        content_lower = content.lower()
-
-        # Buying signal patterns with context
-        signal_patterns = [
-            (r'budget[:\s]*\$?[\d,]+[k]?', 80),  # "Budget: $50k" with 80 chars context
-            (r'timeline[:\s]*[^\n]{0,50}', 60),   # "Timeline: Q1 2025"
-            (r'deadline[:\s]*[^\n]{0,50}', 60),   # "Deadline: Dec 31"
-            (r'willing to pay[^\n]{0,40}', 50),   # "willing to pay $X"
-            (r'\$[\d,]+k?\s*(?:budget|price|cost)', 50),  # "$50k budget"
-            (r'(?:asap|urgent|immediately)', 40),  # Urgency markers
-        ]
-
-        import re
-        for pattern, context_size in signal_patterns:
-            matches = re.finditer(pattern, content_lower, re.IGNORECASE)
-            for match in matches:
-                start = max(0, match.start() - context_size // 2)
-                end = min(len(content), match.end() + context_size // 2)
-                snippet = content[start:end].strip()
-                if snippet and snippet not in signal_snippets:
-                    signal_snippets.append(snippet)
-
-        # Calculate space allocation
-        signal_text = ' ... '.join(signal_snippets[:3])  # Max 3 signals
-        signal_length = len(signal_text)
-
-        # Allocate remaining space between beginning and end
-        remaining = max_chars - signal_length - 10  # Reserve 10 for separators
-
-        if signal_snippets:
-            # If we found signals, use 70% for beginning, 30% for end
-            beginning_chars = int(remaining * 0.7)
-            end_chars = int(remaining * 0.3)
-
-            beginning = content[:beginning_chars].strip()
-            ending = content[-end_chars:].strip() if end_chars > 0 else ""
-
-            # Combine: beginning + signals + end
-            parts = [beginning, signal_text, ending]
-            return ' [...] '.join([p for p in parts if p])
-        else:
-            # No signals found, use hybrid truncation (70% beginning, 30% end)
-            beginning_chars = int(max_chars * 0.7)
-            end_chars = int(max_chars * 0.3)
-
-            beginning = content[:beginning_chars].strip()
-            ending = content[-end_chars:].strip()
-
-            return f"{beginning} [...] {ending}"
-
     def _build_batch_qualification_prompt(self, leads: list[Lead]) -> str:
-        """Build prompt for qualifying multiple leads at once."""
+        """Build lean batch prompt - 300 chars per lead max."""
 
-        # Build lead summaries
+        # Build lead summaries (OPTIMIZED: 300 chars per lead)
         lead_summaries = []
         for idx, lead in enumerate(leads, 1):
-            # IMPROVED: Smart content extraction instead of blind truncation
-            content = self._extract_smart_content(lead.content, max_chars=500)
+            content = lead.content[:300]  # Simple truncation
             title = lead.title or ""
-            full_text = f"{title}\n\n{content}" if title else content
+            full_text = f"{title}\n{content}" if title else content
 
-            lead_summary = f"""
-Lead #{idx}:
-Source: {lead.source}
-Author: {lead.author}
-URL: {lead.url}
-Metadata: {lead.metadata}
-Content:
-{full_text}
-"""
+            lead_summary = f"Lead #{idx}: {full_text}"
             lead_summaries.append(lead_summary)
 
-        all_leads_text = "\n" + "="*60 + "\n".join(lead_summaries)
+        all_leads_text = "\n\n".join(lead_summaries)
 
-        prompt = f"""You are qualifying {len(leads)} sales leads for Shamla Tech (India-based Web3/RWA tokenization firm).
+        prompt = f"""Qualify {len(leads)} leads for Shamla Tech (Web3/RWA/Blockchain/AI).
 
-**ANALYZE EACH LEAD INDEPENDENTLY** but maintain consistency in your qualification standards.
+**Services:** RWA Tokenization, Crypto/Web3, Blockchain, AI/ML
 
-**OUR SERVICES:**
-- RWA Tokenization: Tokenizing real-world assets on blockchain
-- Crypto/Web3: DeFi, Web3 apps, smart contracts, crypto integration
-- Blockchain: Custom blockchain, distributed ledger, consensus
-- AI/ML: AI automation, ML models, chatbots, neural networks
+**Qualify if:** (1) Explicit help-seeking, (2) Buying signals (budget/timeline/urgency), (3) Implicit (problem + context)
+**Reject:** Discussion, news, spam, no business context
 
-**QUALIFICATION CRITERIA:**
-Qualify if lead shows clear service-seeking intent:
-1. EXPLICIT help-seeking phrases ("looking for", "need help", etc.)
-2. STRONG buying signals ([Hiring] tags, budgets, urgency, RFP)
-3. IMPLICIT needs (problem + business context)
-
-**LEADS TO ANALYZE:**
+**Leads:**
 {all_leads_text}
 
-**INSTRUCTIONS:**
-1. Analyze each lead independently
-2. Maintain consistent qualification standards across all leads
-3. Compare similar leads to ensure fairness
-4. Quote specific phrases from each lead in your reasons
+JSON array: {{"results": [{{"lead_number": 1, "is_qualified": true/false, "confidence_score": 0.0-1.0, "reason": "quoted phrase", "service_match": ["RWA Tokenization"]}}]}}
 
-Response format (JSON array with one object per lead):
-{{
-  "results": [
-    {{
-      "lead_number": 1,
-      "is_qualified": true/false,
-      "confidence_score": 0.0-1.0,
-      "reason": "Quote specific help-seeking phrase or buying signal found",
-      "service_match": ["RWA Tokenization"] or ["Crypto/Web3"] or []
-    }},
-    {{
-      "lead_number": 2,
-      ...
-    }}
-  ]
-}}
-
-CRITICAL: Return exactly {len(leads)} results in the same order as the leads above."""
+Return exactly {len(leads)} results in order."""
 
         return prompt
 
     def qualify_lead(self, lead: Lead) -> dict:
         """
-        Qualify a lead using strict validation + GPT-4-turbo.
-        
-        Pre-validates content for help-seeking phrases before expensive LLM call.
-        NOW WITH RELAXED VALIDATION: Allows implicit service inquiries through to LLM.
-        
+        Qualify a lead using consolidated pre-filter + GPT-4-turbo.
+
+        OPTIMIZED: Single decisive pre-filter that only blocks obvious spam/hiring.
+
         Args:
             lead: Lead object to qualify
-            
+
         Returns:
             dict with:
                 - is_qualified (bool): Whether lead is qualified
@@ -912,24 +398,19 @@ CRITICAL: Return exactly {len(leads)} results in the same order as the leads abo
                 - skipped_llm (bool, optional): True if LLM call was skipped
                 - error (str, optional): Error message if failed
         """
-        # RELAXED PRE-VALIDATION: Only skip obvious non-inquiries
-        # Let LLM evaluate borderline cases instead of pre-filtering
-        
-        # Quick rejection: obvious spam/promotion/news
-        if self._is_obvious_non_inquiry(lead.content):
+        # CONSOLIDATED PRE-FILTER: Single decisive check
+        should_send, block_reason = self._should_send_to_llm(lead)
+
+        if not should_send:
             return {
                 "is_qualified": False,
                 "confidence_score": 0.0,
-                "reason": "Content is spam/promotion/news, not inquiry",
+                "reason": f"Pre-filter blocked: {block_reason}",
                 "service_match": [],
                 "skipped_llm": True
             }
-        
-        # SIMPLIFIED: Remove strict pre-filter, let LLM decide
-        # The Reddit soft filter + spam detection already removed obvious junk
-        # Pre-filtering was causing more harm (rejecting valid implicit inquiries)
-        
-        # If validations pass, proceed with LLM call
+
+        # If pre-filter passes, proceed with LLM call
         try:
             prompt = self._build_qualification_prompt(lead)
             
@@ -1172,13 +653,13 @@ CRITICAL: Return exactly {len(leads)} results in the same order as the leads abo
     async def qualify_leads_in_batches(
         self,
         leads: list[Lead],
-        batch_size: int = 50,
+        batch_size: int = 100,
         max_concurrent: int = 5,
-        llm_batch_size: int = 10,
+        llm_batch_size: int = 20,
         progress_callback: Optional[callable] = None
     ) -> list[dict]:
         """
-        IMPROVED: Qualify leads in batches with progressive saving, cost tracking, AND LLM-side batching.
+        OPTIMIZED: Qualify leads in batches with progressive saving, cost tracking, AND LLM-side batching.
 
         Benefits:
         - Checkpointing: Save after each batch (crash recovery)
@@ -1189,9 +670,9 @@ CRITICAL: Return exactly {len(leads)} results in the same order as the leads abo
 
         Args:
             leads: List of Lead objects
-            batch_size: Leads per progress batch (default: 50)
+            batch_size: Leads per progress batch (default: 100, increased from 50)
             max_concurrent: Max concurrent API requests within batch
-            llm_batch_size: Leads per LLM API call (default: 10) - HIGHER = BETTER RESULTS
+            llm_batch_size: Leads per LLM API call (default: 20, increased from 10) - HIGHER = BETTER CONSISTENCY
             progress_callback: Optional function called after each batch
 
         Returns:
@@ -1332,14 +813,14 @@ async def qualify_leads_concurrent(
 
 async def qualify_leads_in_batches(
     leads: list[Lead],
-    batch_size: int = 50,
+    batch_size: int = 100,
     max_concurrent: int = 5,
-    llm_batch_size: int = 10,
+    llm_batch_size: int = 20,
     target_service: Optional[str] = None,
     progress_callback: Optional[callable] = None
 ) -> list[dict]:
     """
-    IMPROVED: Qualify leads in batches with progressive saving, cost tracking, AND LLM-side batching.
+    OPTIMIZED: Qualify leads in batches with progressive saving, cost tracking, AND LLM-side batching.
 
     Benefits over qualify_leads_concurrent:
     - LLM batching: Send multiple leads per API call (better consistency, lower cost)
@@ -1350,9 +831,9 @@ async def qualify_leads_in_batches(
 
     Args:
         leads: List of Lead objects
-        batch_size: Leads per progress batch (default: 50)
+        batch_size: Leads per progress batch (default: 100, increased from 50)
         max_concurrent: Max concurrent API requests (deprecated with LLM batching)
-        llm_batch_size: Leads per LLM API call (default: 10) - HIGHER = BETTER CONSISTENCY
+        llm_batch_size: Leads per LLM API call (default: 20, increased from 10) - HIGHER = BETTER CONSISTENCY
         target_service: Filter for specific service (e.g., 'RWA', 'Crypto')
         progress_callback: Optional callback function(batch_num, total_batches, batch_results, stats)
 
@@ -1360,17 +841,17 @@ async def qualify_leads_in_batches(
         List of qualification results in same order as input leads
 
     Example:
-        # Basic usage with LLM batching
+        # Basic usage with LLM batching (OPTIMIZED DEFAULTS)
         results = await qualify_leads_in_batches(
             leads,
-            batch_size=50,
-            llm_batch_size=10  # 10 leads per API call
+            batch_size=100,    # Process 100 leads per checkpoint
+            llm_batch_size=20  # 20 leads per API call (better consistency!)
         )
 
-        # Higher LLM batch size = more consistent results
+        # Higher LLM batch size = even more consistent results
         results = await qualify_leads_in_batches(
             leads,
-            llm_batch_size=15  # Even better consistency
+            llm_batch_size=25  # Maximum consistency
         )
 
         # With progress callback for saving
@@ -1380,8 +861,8 @@ async def qualify_leads_in_batches(
 
         results = await qualify_leads_in_batches(
             leads,
-            batch_size=50,
-            llm_batch_size=10,
+            batch_size=100,
+            llm_batch_size=20,
             progress_callback=save_batch
         )
     """

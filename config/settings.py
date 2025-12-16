@@ -159,344 +159,136 @@ class ScrapingConfig:
     ]
     
     KEYWORD_PRESETS = {
+        # OPTIMIZED: 8 core presets, 15 keywords each, no platform variants
+
         # ============================================================
-        # COMPETITOR FRUSTRATION - Find leads dissatisfied with competitors
+        # 1. COMPETITOR FRUSTRATION (cross-platform)
         # ============================================================
-        'competitor_frustration_reddit': [
-            # Direct competitor complaints
-            "Antier Solutions problems", "issues with Antier", "Antier delay",
-            "Accubits problems", "Accubits expensive", "issues with Accubits",
-            "LeewayHertz overpriced", "LeewayHertz delay", "LeewayHertz issues",
-            "SoluLab problems", "SoluLab slow", "issues with SoluLab",
-            "Primafelicitas expensive", "Primafelicitas delay",
-            "Somish problems", "IdeaUsher issues", "Codezeros slow",
-            
-            # Alternative seeking (Reddit style)
-            "alternative to Antier", "better than Antier Solutions",
-            "alternative to LeewayHertz", "better than LeewayHertz",
-            "alternative to Accubits", "cheaper than Accubits",
-            "alternative to SoluLab", "better RWA platform than",
-            "alternative to Primafelicitas", "alternative tokenization platform",
-            
-            # Generic frustration with current provider
-            "current Web3 agency problems", "blockchain consultant issues",
-            "RWA platform not working", "tokenization service delay",
-            "Web3 developer unresponsive", "blockchain project stuck",
-            "need new RWA consultant", "switch tokenization provider",
-            "looking to change Web3 agency", "disappointed with current",
-            
-            # Budget/quality complaints
-            "RWA tokenization too expensive", "Web3 agency overcharging",
-            "blockchain consultant overpriced", "tokenization costs too high",
-            "cheaper RWA solution", "affordable tokenization platform",
-            "better value blockchain", "cost-effective Web3",
-        ],
-        
-        'competitor_frustration_linkedin': [
-            # Professional LinkedIn language
-            "seeking alternative to [competitor]",
-            "replacing current Web3 vendor",
-            "RFP tokenization services",
-            "evaluating RWA platforms",
-            "blockchain vendor comparison",
-            "Web3 agency RFP",
-            "tokenization platform evaluation",
-            "dissatisfied with current provider",
-            "seeking better RWA solution",
-            "competitive RWA pricing",
-            "alternative blockchain consultant",
-            "Web3 vendor alternatives",
+        'competitor_frustration': [
+            "alternative to Antier", "alternative to LeewayHertz",
+            "alternative to Accubits", "alternative to SoluLab",
+            "alternative tokenization", "disappointed with current",
+            "need new consultant", "switch provider",
+            "blockchain consultant issues", "RWA platform not working",
+            "tokenization too expensive", "Web3 agency overcharging",
+            "better RWA solution", "replacing current vendor",
+            "blockchain vendor comparison"
         ],
         
         # ============================================================
-        # REDDIT-OPTIMIZED: Short, casual, forum-style
-        # ============================================================
-        'rwa_reddit': [
-            # Tier 1: Explicit hiring/service requests (r/forhire style)
-            "[Hiring] tokenization",
-            "[Hiring] RWA developer",
-            "[For Hire] blockchain",
-            "[Task] smart contract",
-            "[Task] tokenization",
-            "need developer tokenization",
-            "hiring blockchain consultant",
-            "looking for RWA developer",
-            "need RWA consultant",
-            "hiring asset tokenization",
-            
-            # Tier 2: Help-seeking (casual Reddit language)
-            "how do I tokenize",
-            "how to tokenize real estate",
-            "help with tokenization",
-            "tokenization advice",
-            "recommend tokenization platform",
-            "best way to tokenize assets",
-            "anyone know tokenization",
-            "fractional ownership platform",
-            "how to fractionalize assets",
-            "real estate fractionalization",
-            
-            # Tier 3: Problem statements (implicit need)
-            "tokenization too expensive",
-            "struggling with asset tokenization",
-            "tokenization budget",
-            "need simple tokenization",
-            "tokenization for small business",
-            "affordable asset tokenization",
-            "cost effective tokenization",
-            
-            # Tier 4: Specific Asset Classes (high intent)
-            "tokenize real estate",
-            "tokenize property",
-            "tokenize commodities",
-            "tokenize gold",
-            "tokenize artwork",
-            "tokenize wine",
-            "tokenize commercial property",
-            "tokenize rental property",
-            "property backed tokens",
-            "real estate backed tokens",
-            
-            # Tier 5: Fractional ownership (RWA core use case)
-            "fractional real estate",
-            "fractional property ownership",
-            "fractionalized assets",
-            "partial ownership platform",
-            "share ownership real estate",
-            
-            # Tier 6: Broader RWA topics (will catch discussions)
-            "real world asset tokenization",
-            "RWA platform",
-            "tokenized real estate",
-            "asset backed tokens",
-            "security token offering",
-            "STO platform",
-            "digital securities",
-        ],
-        
-        # ============================================================
-        # LINKEDIN-OPTIMIZED: Professional, job-posting style
-        # ============================================================
-        'rwa_linkedin': [
-            # Strategy: Use single keywords that appear in job posts/requests
-            # LinkedIn's literal search means complex phrases backfire
-            
-            # Core RWA terms (high relevance)
-            "tokenization consultant",
-            "RWA developer",
-            "RWA consultant",
-            "asset tokenization expert",
-            "blockchain tokenization",
-            "real estate tokenization",
-            "tokenization specialist",
-            "fractional ownership platform",
-            
-            # Job posting language
-            "tokenization position",
-            "hiring tokenization",
-            "tokenization role",
-            "tokenization engineer",
-            "tokenization architect",
-            "RWA engineer",
-            "asset tokenization developer",
-            
-            # Project-based (catches RFPs/project posts)
-            "tokenization project",
-            "RWA implementation",
-            "tokenization solution",
-            "tokenization platform development",
-            "asset tokenization initiative",
-            "digital asset tokenization",
-            "security token project",
-            
-            # Specific Asset Classes (enterprise signals)
-            "real estate tokenization project",
-            "property tokenization",
-            "commercial real estate tokenization",
-            "commodity tokenization",
-            "art tokenization",
-            "precious metals tokenization",
-            
-            # Fractional ownership (key RWA use case)
-            "fractional ownership",
-            "fractionalization platform",
-            "fractional real estate",
-            "partial ownership solution",
-            
-            # Security tokens (regulated RWA)
-            "security token offering",
-            "STO platform",
-            "digital securities",
-            "tokenized securities",
-            "regulated token",
-            
-            # Budget/commercial signals
-            "tokenization RFP",
-            "tokenization proposal",
-            "tokenization partnership",
-            "tokenization vendor",
-            "asset tokenization services",
-            "tokenization company",
-            
-            # Enterprise/institutional language
-            "institutional tokenization",
-            "enterprise tokenization",
-            "tokenization compliance",
-            "regulated tokenization",
-            
-            # Avoid: "looking for" (returns "looking back at", "if you're looking for")
-            # Avoid: Long phrases (LinkedIn doesn't do semantic search)
-        ],
-        
-      
-        # ============================================================
-        # UNIVERSAL RWA (works on both, but less optimized)
+        # 2. RWA TOKENIZATION (cross-platform)
         # ============================================================
         'rwa': [
-            # Conservative keywords that work across platforms
-            "tokenization",
-            "RWA tokenization",
-            "asset tokenization",
-            "real world asset",
-            "real estate tokenization",
-            "property tokenization",
-            "tokenization service",
-            "blockchain tokenization",
-            "tokenization consultant",
-            "tokenization platform",
-            "tokenization developer",
-            "smart contract tokenization",
-            "fractional ownership",
-            "fractionalized assets",
-            "security token",
-            "digital securities",
-            "tokenized assets",
-            "asset backed token",
-            "commodity tokenization",
-            "STO platform",
-            "security token offering",
+            "tokenization consultant", "RWA developer",
+            "asset tokenization", "real estate tokenization",
+            "tokenization platform", "fractional ownership",
+            "security token offering", "STO platform",
+            "tokenize real estate", "tokenization project",
+            "tokenization service", "blockchain tokenization",
+            "looking for RWA", "need tokenization", "hiring tokenization"
         ],
         
         # ============================================================
-        # CRYPTO SERVICES
+        # 3. CRYPTO/WEB3 (cross-platform)
         # ============================================================
-        'crypto_reddit': [
-            "[Hiring] crypto developer",
-            "[For Hire] web3",
-            "need crypto help",
-            "crypto integration advice",
-            "recommend crypto developer",
-            "web3 developer needed",
-            "DeFi help",
-            "smart contract audit",
-        ],
-        
-        'crypto_linkedin': [
-            "crypto developer position",
-            "web3 engineer",
-            "DeFi consultant",
-            "crypto integration project",
-            "blockchain developer hiring",
-            "smart contract developer",
-            "crypto payment integration",
-        ],
-        
         'crypto': [
-            "crypto developer",
-            "web3 consultant",
-            "DeFi platform",
-            "crypto integration",
-            "smart contract developer",
+            "crypto developer", "web3 consultant",
+            "DeFi platform", "crypto integration",
+            "smart contract developer", "web3 engineer",
+            "DeFi consultant", "smart contract audit",
+            "crypto payment", "blockchain developer",
+            "need crypto help", "hiring crypto",
+            "web3 project", "DeFi development", "crypto consultant"
         ],
-        
+
         # ============================================================
-        # AI/ML SERVICES
+        # 4. AI/ML (cross-platform)
         # ============================================================
-        'ai_reddit': [
-            "[Hiring] AI developer",
-            "[Task] machine learning",
-            "need AI help",
-            "AI automation advice",
-            "recommend AI consultant",
-            "chatbot development help",
-            "ML model help",
-        ],
-        
-        'ai_linkedin': [
-            "AI consultant position",
-            "machine learning engineer",
-            "AI automation project",
-            "chatbot developer",
-            "ML engineer hiring",
-            "AI integration specialist",
-        ],
-        
         'ai': [
-            "AI consultant",
-            "machine learning",
-            "AI automation",
-            "chatbot development",
-            "AI integration",
+            "AI consultant", "machine learning engineer",
+            "AI automation", "chatbot development",
+            "AI integration", "ML model",
+            "AI developer", "chatbot developer",
+            "ML engineer", "AI specialist",
+            "need AI help", "hiring AI",
+            "AI project", "machine learning consultant", "AI automation project"
         ],
-        
+
         # ============================================================
-        # BLOCKCHAIN SERVICES
+        # 5. BLOCKCHAIN (cross-platform)
         # ============================================================
-        'blockchain_reddit': [
-            "[Hiring] blockchain developer",
-            "[For Hire] smart contract",
-            "need blockchain help",
-            "blockchain consultant advice",
-            "smart contract audit help",
-            "recommend blockchain developer",
-        ],
-        
-        'blockchain_linkedin': [
-            "blockchain consultant position",
-            "blockchain architect",
-            "blockchain developer hiring",
-            "smart contract engineer",
-            "blockchain integration project",
-            "distributed ledger consultant",
-        ],
-        
         'blockchain': [
-            "blockchain consultant",
-            "blockchain developer",
-            "smart contract",
-            "blockchain integration",
-            "distributed ledger",
+            "blockchain consultant", "blockchain developer",
+            "smart contract", "blockchain integration",
+            "distributed ledger", "blockchain architect",
+            "smart contract engineer", "blockchain project",
+            "need blockchain help", "hiring blockchain",
+            "blockchain solution", "smart contract audit",
+            "blockchain platform", "blockchain engineer", "blockchain specialist"
         ],
-        
+
         # ============================================================
-        # GENERIC SERVICE-SEEKING (platform-agnostic)
+        # 6. WEB3 GENERAL (cross-platform)
         # ============================================================
-        'general': [
-            "consultant needed",
-            "developer needed",
-            "expert needed",
-            "service recommendation",
-            "platform recommendation",
+        'web3': [
+            "web3 developer", "web3 consultant",
+            "web3 platform", "web3 integration",
+            "web3 project", "web3 engineer",
+            "decentralized app", "dApp developer",
+            "web3 architect", "web3 solution",
+            "need web3 help", "hiring web3",
+            "web3 specialist", "web3 service", "web3 development"
+        ],
+
+        # ============================================================
+        # 7. DEFI (cross-platform)
+        # ============================================================
+        'defi': [
+            "DeFi developer", "DeFi consultant",
+            "DeFi platform", "DeFi protocol",
+            "DeFi integration", "DeFi project",
+            "DeFi engineer", "DeFi solution",
+            "liquidity pool", "yield farming",
+            "staking platform", "DEX development",
+            "DeFi architecture", "need DeFi help", "hiring DeFi"
+        ],
+
+        # ============================================================
+        # 8. SMART CONTRACTS (cross-platform)
+        # ============================================================
+        'smart_contracts': [
+            "smart contract developer", "smart contract audit",
+            "Solidity developer", "smart contract engineer",
+            "contract security", "smart contract project",
+            "Ethereum developer", "smart contract consultant",
+            "contract development", "smart contract specialist",
+            "need smart contract", "hiring solidity",
+            "smart contract review", "contract audit", "smart contract integration"
         ],
     }
     
     # ===================================================================
-    # KEYWORD USAGE GUIDE
+    # KEYWORD USAGE GUIDE (OPTIMIZED)
     # ===================================================================
-    # 
-    # REDDIT RUNS:
-    # python main.py --sources reddit --service rwa_reddit --qualify --max-total-leads 200
-    # - Uses Reddit-optimized keywords (casual, forum-style)
-    # - Searches r/forhire, r/slavelabour, etc.
-    # - Catches "[Hiring]" posts and help-seeking questions
-    # 
-    # LINKEDIN RUNS:
-    # python main.py --sources linkedin_apify --service rwa_linkedin --qualify --max-total-leads 200
-    # - Uses LinkedIn-optimized keywords (professional, job-posting style)
-    # - Avoids complex phrases that match wrong content
-    # - Focuses on job postings and project announcements
-    # 
-    # BOTH PLATFORMS (TESTING):
+    #
+    # OPTIMIZED: All presets are now cross-platform (no _reddit/_linkedin variants)
+    #
+    # Usage examples:
+    # python main.py --sources reddit --service rwa --qualify
+    # python main.py --sources linkedin_apify --service rwa --qualify
+    # python main.py --sources reddit --service crypto --qualify
+    # python main.py --sources linkedin_apify --service blockchain --qualify
+    #
+    # Available services:
+    # - competitor_frustration: Find leads dissatisfied with competitors
+    # - rwa: RWA tokenization and fractional ownership
+    # - crypto: Crypto/Web3 development
+    # - ai: AI/ML automation and chatbots
+    # - blockchain: Blockchain and distributed ledger
+    # - web3: Web3 and dApp development
+    # - defi: DeFi protocols and platforms
+    # - smart_contracts: Smart contract development and audits
+    #
     # python main.py --sources reddit,linkedin_apify --service rwa --qualify --max-total-leads 100
     # - Uses universal keywords
     # - Good for A/B testing which platform performs better
@@ -525,8 +317,8 @@ class ScrapingConfig:
     ])
     
     max_results_per_source: int = 100
-    max_total_leads: int = 200  # Global limit - stops scraping after this many total leads
-    days_filter: int = config("DAYS_FILTER", default=7, cast=int)  # Universal date filter for all sources (0 = no filter)
+    max_total_leads: int = 500  # OPTIMIZED: Global limit (increased from 200)
+    days_filter: int = config("DAYS_FILTER", default=14, cast=int)  # OPTIMIZED: Universal date filter (increased from 7 days)
     scrape_interval_seconds: int = 300  # 5 minutes
     enable_sentiment_filter: bool = True
     min_engagement_score: int = 0  # minimum upvotes/reactions (0 = allow posts with no engagement)
