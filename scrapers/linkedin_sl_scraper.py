@@ -231,29 +231,20 @@ class LinkedInSeleniumScraper(BaseScraper):
         return False
     
     def _handle_rate_limit(self, wait_minutes: int = 60):
-        """Handle rate limit by waiting."""
+        """OPTIMIZED: Handle rate limit with automatic delay (no user input)."""
         print(f"\n⚠️  RATE LIMIT DETECTED (HTTP 429)")
         print(f"   LinkedIn has temporarily blocked your IP")
-        print(f"   This usually happens after too many requests")
-        print(f"\n💡 Solutions:")
-        print(f"   1. Wait {wait_minutes} minutes and try again")
-        print(f"   2. Use a different network (mobile hotspot, VPN)")
-        print(f"   3. Configure a proxy in .env: LINKEDIN_PROXY=http://proxy:port")
-        print(f"   4. Try other platforms: --sources reddit discord slack")
-        
-        user_choice = input(f"\n❓ Wait {wait_minutes} minutes now? (yes/no): ").strip().lower()
-        
-        if user_choice in ['yes', 'y']:
-            print(f"\n⏳ Waiting {wait_minutes} minutes for rate limit to reset...")
-            for i in range(wait_minutes):
-                remaining = wait_minutes - i
-                print(f"   {remaining} minutes remaining...", end='\r')
-                time.sleep(60)
-            print(f"\n✅ Wait complete! Resuming scraping...")
-            return True
-        else:
-            print(f"\n⚠️  Scraping aborted. Try again later or use a proxy.")
-            return False
+        print(f"   Automatically waiting {wait_minutes} minutes...")
+        print(f"\n💡 To avoid this: Use --sources reddit or configure proxy in .env")
+
+        # OPTIMIZED: Automatic wait (no interactive prompt)
+        for i in range(wait_minutes):
+            remaining = wait_minutes - i
+            print(f"   ⏳ {remaining} minutes remaining...", end='\r')
+            time.sleep(60)
+
+        print(f"\n✅ Wait complete! Resuming scraping...")
+        return True
     
     def _apply_rate_limit(self):
         """Apply rate limiting with human-like delays."""
@@ -548,13 +539,10 @@ class LinkedInSeleniumScraper(BaseScraper):
             search_input.clear()
             time.sleep(random.uniform(0.3, 0.6))
             
-            # Type keyword character by character (human-like)
-            print(f"  → Typing keyword...")
-            for char in keyword:
-                search_input.send_keys(char)
-                time.sleep(random.uniform(0.05, 0.15))
-            
-            time.sleep(random.uniform(1, 2))
+            # OPTIMIZED: Direct input (no character-by-character typing)
+            print(f"  → Entering keyword...")
+            search_input.send_keys(keyword)
+            time.sleep(random.uniform(0.5, 1))
             
             # Press Enter
             search_input.send_keys(Keys.RETURN)
@@ -575,10 +563,10 @@ class LinkedInSeleniumScraper(BaseScraper):
             except:
                 print(f"  ℹ️  Posts filter not found, using current results...")
             
-            # Start infinite scroll
+            # Start infinite scroll (OPTIMIZED: reduced from 50 to 30)
             print(f"  🔄 Starting infinite scroll (target: {posts_limit} posts)...")
             scroll_count = 0
-            max_scrolls = 50
+            max_scrolls = 30
             stagnation_count = 0
             previous_post_count = 0
             
