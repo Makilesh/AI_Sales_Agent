@@ -567,6 +567,24 @@
                         <div class="help-text">Global limit across all sources</div>
                     </div>
 
+                    <!-- Days Filter (Universal) -->
+                    <div class="form-group">
+                        <label for="daysFilter">📅 Date Filter (All Sources)</label>
+                        <select id="daysFilter" name="days_filter">
+                            <option value="7">Last 7 days</option>
+                            <option value="15">Last 15 days</option>
+                            <option value="30" selected>Last 30 days</option>
+                            <option value="45">Last 45 days</option>
+                            <option value="60">Last 60 days</option>
+                            <option value="90">Last 90 days</option>
+                            <option value="custom">Custom days...</option>
+                            <option value="0">All time (no filter)</option>
+                        </select>
+                        <input type="number" id="customDays" name="custom_days" placeholder="Enter days" 
+                               style="display: none; margin-top: 8px;" min="1" max="365">
+                        <div class="help-text">Filter content from all sources by date (Reddit, LinkedIn, Discord, Slack)</div>
+                    </div>
+
                     <!-- LLM Qualification -->
                     <div class="form-group">
                         <label>🤖 LLM Qualification</label>
@@ -735,35 +753,18 @@
                             <div class="progress-fill" style="width: ${job.progress}%">${job.progress}%</div>
                         </div>
                     ` : ''}
-                    ${job.status === 'completed' && job.leads_found === 0 ? `
-                        <div style="background: #fff3cd; color: #856404; padding: 15px; margin-top: 10px; border-radius: 8px; border-left: 4px solid #ffc107;">
-                            <strong>⚠️ No leads found</strong>
-                            <p style="margin: 5px 0 0 0; font-size: 13px;">
-                                Possible reasons:<br>
-                                • Keywords too specific or no recent posts matching them<br>
-                                • LinkedIn Public scraper is experimental (often gets blocked)<br>
-                                • Try Reddit or LinkedIn Apify for better results<br>
-                                • Use broader keywords or select a service preset
-                            </p>
-                        </div>
-                    ` : ''}
                     ${showActions ? `
                         <div class="job-actions">
                             <button class="btn-sm btn-download" onclick="downloadFile('${job.job_id}', 'json')">
                                 📥 JSON
                             </button>
-                            ${job.all_leads_excel || job.status === 'completed' ? `
-                                <button class="btn-sm btn-download" onclick="downloadFile('${job.job_id}', 'excel_all')" title="All scraped leads (qualified + unqualified)" ${!job.all_leads_excel ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>
-                                    📊 Excel (All) ${!job.all_leads_excel ? '(No leads)' : ''}
-                                </button>
-                            ` : ''}
                             ${job.excel_file ? `
-                                <button class="btn-sm btn-download" onclick="downloadFile('${job.job_id}', 'excel')" title="Only AI-qualified leads">
-                                    ✅ Excel (Qualified)
+                                <button class="btn-sm btn-download" onclick="downloadFile('${job.job_id}', 'excel')">
+                                    📊 Excel
                                 </button>
                             ` : ''}
-                            <button class="btn-sm btn-view" onclick="viewLeads('${job.job_id}')" ${job.leads_found === 0 ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>
-                                👁️ View Leads ${job.leads_found === 0 ? '(None)' : ''}
+                            <button class="btn-sm btn-view" onclick="viewLeads('${job.job_id}')">
+                                👁️ View Leads
                             </button>
                         </div>
                     ` : ''}
@@ -779,6 +780,17 @@
         // Show/hide service filter based on qualification checkbox
         document.getElementById('qualify').addEventListener('change', function() {
             document.getElementById('filterServiceGroup').style.display = this.checked ? 'block' : 'none';
+        });
+
+        // Show/hide custom days input
+        document.getElementById('daysFilter').addEventListener('change', function() {
+            const customInput = document.getElementById('customDays');
+            if (this.value === 'custom') {
+                customInput.style.display = 'block';
+                customInput.focus();
+            } else {
+                customInput.style.display = 'none';
+            }
         });
 
         // Form submission
@@ -803,6 +815,15 @@
             const maxLeads = parseInt(document.getElementById('maxLeads').value);
             const qualify = document.getElementById('qualify').checked;
             const filterService = document.getElementById('filterService').value;
+            
+            // Handle days filter (custom or preset)
+            let daysFilter;
+            const daysFilterSelect = document.getElementById('daysFilter').value;
+            if (daysFilterSelect === 'custom') {
+                daysFilter = parseInt(document.getElementById('customDays').value) || 30;
+            } else {
+                daysFilter = parseInt(daysFilterSelect);
+            }
 
             // Prepare request data
             const requestData = {
@@ -810,6 +831,7 @@
                 service_preset: servicePreset || null,
                 custom_keywords: customKeywords,
                 max_leads: maxLeads,
+                days_filter: daysFilter,
                 qualify,
                 filter_service: filterService || null
             };
@@ -905,74 +927,8 @@
 
         // View leads
         async function viewLeads(jobId) {
-            try {
-                const response = await fetch(`/api/leads/${jobId}?page=1&per_page=50`);
-                if (!response.ok) {
-                    throw new Error('Failed to fetch leads');
-                }
-                
-                const data = await response.json();
-                
-                if (!data.leads || data.leads.length === 0) {
-                    alert(`No leads found for ${jobId}\n\nThe scraping job completed but didn't find any leads matching your criteria.`);
-                    return;
-                }
-                
-                // Create modal content
-                let modalContent = `
-                    <div style="max-height: 70vh; overflow-y: auto;">
-                        <h3>Leads for ${jobId}</h3>
-                        <p>Showing ${data.leads.length} of ${data.total} leads</p>
-                        <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
-                            <thead>
-                                <tr style="background: #667eea; color: white;">
-                                    <th style="padding: 10px; text-align: left;">Author</th>
-                                    <th style="padding: 10px; text-align: left;">Source</th>
-                                    <th style="padding: 10px; text-align: left;">Content</th>
-                                    <th style="padding: 10px; text-align: left;">Engagement</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                `;
-                
-                data.leads.forEach(lead => {
-                    const content = lead.content.substring(0, 100) + (lead.content.length > 100 ? '...' : '');
-                    modalContent += `
-                        <tr style="border-bottom: 1px solid #ddd;">
-                            <td style="padding: 10px;">${lead.author}</td>
-                            <td style="padding: 10px;">${lead.source}</td>
-                            <td style="padding: 10px;">${content}</td>
-                            <td style="padding: 10px;">${lead.engagement_score || 0}</td>
-                        </tr>
-                    `;
-                });
-                
-                modalContent += `
-                            </tbody>
-                        </table>
-                        <div style="margin-top: 20px; text-align: center;">
-                            <button onclick="this.closest('.modal-overlay').remove()" 
-                                    style="padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer;">
-                                Close
-                            </button>
-                        </div>
-                    </div>
-                `;
-                
-                // Create and show modal
-                const modal = document.createElement('div');
-                modal.className = 'modal-overlay';
-                modal.innerHTML = `
-                    <div class="modal-content" style="background: white; padding: 30px; border-radius: 10px; max-width: 900px; margin: 50px auto;">
-                        ${modalContent}
-                    </div>
-                `;
-                modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 1000; overflow-y: auto;';
-                document.body.appendChild(modal);
-                
-            } catch (error) {
-                alert(`Error loading leads: ${error.message}`);
-            }
+            // TODO: Implement modal or new page to view leads
+            alert(`Viewing leads for ${jobId}\n\nThis feature will open a detailed view of all leads.`);
         }
 
         // Show alert

@@ -38,6 +38,15 @@ class RedditConfig:
         "cryptodevs",  # Crypto developers asking questions
         "realestateinvesting",  # Real estate investors (RWA target)
         "RealEstate",  # Real estate professionals (RWA target)
+        
+        # TIER 4: RWA-SPECIFIC SUBREDDITS (High relevance for Shamla Tech)
+        "tokenization",  # Asset tokenization discussions
+        "defi",  # DeFi and tokenized assets
+        "investing",  # General investment discussions (RWA opportunities)
+        "CommercialRealEstate",  # Commercial property tokenization
+        "RealEstateInvestments",  # Property investment (tokenization fit)
+        "SecurityTokens",  # Security token offerings
+        "assetmanagement",  # Asset management (tokenization candidates)
     ])
 
 
@@ -83,9 +92,10 @@ class LinkedInApifyConfig:
     """LinkedIn scraping via Apify API (production-ready, no account risk)."""
     enabled: bool = config("LINKEDIN_APIFY_ENABLED", default=False, cast=bool)
     apify_token: str = config("APIFY_TOKEN", default="")
-    actor_id: str = config("LINKEDIN_APIFY_ACTOR", default="supreme_coder/linkedin-post")
-    max_posts_per_keyword: int = 50
+    actor_id: str = config("LINKEDIN_APIFY_ACTOR", default="apify/linkedin-posts-scraper")
+    max_posts_per_keyword: int = config("LINKEDIN_MAX_POSTS", default=200, cast=int)  # Increase for more results
     rate_limit: int = 10  # Apify API calls per minute
+    days_filter: int = config("LINKEDIN_DAYS_FILTER", default=30, cast=int)  # Only posts from last N days
     
     # LinkedIn authentication (required by some actors)
     linkedin_cookie: str = config("LINKEDIN_COOKIE", default="")  # li_at cookie value
@@ -97,6 +107,7 @@ class LinkedInApifyConfig:
     scrape_discussions: bool = True  # Discussion threads
     scrape_comments: bool = True  # Post comments
     scrape_reactions: bool = True  # Like/reaction data
+    min_reactions: int = config("LINKEDIN_MIN_REACTIONS", default=0, cast=int)  # Minimum engagement (0 = all posts)
     
     # Filtering options
     only_posts: bool = True  # Exclude company updates/ads
@@ -203,19 +214,27 @@ class ScrapingConfig:
         'rwa_reddit': [
             # Tier 1: Explicit hiring/service requests (r/forhire style)
             "[Hiring] tokenization",
+            "[Hiring] RWA developer",
             "[For Hire] blockchain",
             "[Task] smart contract",
+            "[Task] tokenization",
             "need developer tokenization",
             "hiring blockchain consultant",
             "looking for RWA developer",
+            "need RWA consultant",
+            "hiring asset tokenization",
             
             # Tier 2: Help-seeking (casual Reddit language)
             "how do I tokenize",
+            "how to tokenize real estate",
             "help with tokenization",
             "tokenization advice",
             "recommend tokenization platform",
             "best way to tokenize assets",
             "anyone know tokenization",
+            "fractional ownership platform",
+            "how to fractionalize assets",
+            "real estate fractionalization",
             
             # Tier 3: Problem statements (implicit need)
             "tokenization too expensive",
@@ -223,12 +242,36 @@ class ScrapingConfig:
             "tokenization budget",
             "need simple tokenization",
             "tokenization for small business",
+            "affordable asset tokenization",
+            "cost effective tokenization",
             
-            # Tier 4: Broader RWA topics (will catch discussions)
+            # Tier 4: Specific Asset Classes (high intent)
+            "tokenize real estate",
+            "tokenize property",
+            "tokenize commodities",
+            "tokenize gold",
+            "tokenize artwork",
+            "tokenize wine",
+            "tokenize commercial property",
+            "tokenize rental property",
+            "property backed tokens",
+            "real estate backed tokens",
+            
+            # Tier 5: Fractional ownership (RWA core use case)
+            "fractional real estate",
+            "fractional property ownership",
+            "fractionalized assets",
+            "partial ownership platform",
+            "share ownership real estate",
+            
+            # Tier 6: Broader RWA topics (will catch discussions)
             "real world asset tokenization",
             "RWA platform",
             "tokenized real estate",
             "asset backed tokens",
+            "security token offering",
+            "STO platform",
+            "digital securities",
         ],
         
         # ============================================================
@@ -241,9 +284,12 @@ class ScrapingConfig:
             # Core RWA terms (high relevance)
             "tokenization consultant",
             "RWA developer",
+            "RWA consultant",
             "asset tokenization expert",
             "blockchain tokenization",
             "real estate tokenization",
+            "tokenization specialist",
+            "fractional ownership platform",
             
             # Job posting language
             "tokenization position",
@@ -251,18 +297,52 @@ class ScrapingConfig:
             "tokenization role",
             "tokenization engineer",
             "tokenization architect",
+            "RWA engineer",
+            "asset tokenization developer",
             
             # Project-based (catches RFPs/project posts)
             "tokenization project",
             "RWA implementation",
             "tokenization solution",
             "tokenization platform development",
+            "asset tokenization initiative",
+            "digital asset tokenization",
+            "security token project",
+            
+            # Specific Asset Classes (enterprise signals)
+            "real estate tokenization project",
+            "property tokenization",
+            "commercial real estate tokenization",
+            "commodity tokenization",
+            "art tokenization",
+            "precious metals tokenization",
+            
+            # Fractional ownership (key RWA use case)
+            "fractional ownership",
+            "fractionalization platform",
+            "fractional real estate",
+            "partial ownership solution",
+            
+            # Security tokens (regulated RWA)
+            "security token offering",
+            "STO platform",
+            "digital securities",
+            "tokenized securities",
+            "regulated token",
             
             # Budget/commercial signals
             "tokenization RFP",
             "tokenization proposal",
             "tokenization partnership",
             "tokenization vendor",
+            "asset tokenization services",
+            "tokenization company",
+            
+            # Enterprise/institutional language
+            "institutional tokenization",
+            "enterprise tokenization",
+            "tokenization compliance",
+            "regulated tokenization",
             
             # Avoid: "looking for" (returns "looking back at", "if you're looking for")
             # Avoid: Long phrases (LinkedIn doesn't do semantic search)
@@ -277,13 +357,24 @@ class ScrapingConfig:
             "tokenization",
             "RWA tokenization",
             "asset tokenization",
+            "real world asset",
             "real estate tokenization",
+            "property tokenization",
             "tokenization service",
             "blockchain tokenization",
             "tokenization consultant",
             "tokenization platform",
             "tokenization developer",
             "smart contract tokenization",
+            "fractional ownership",
+            "fractionalized assets",
+            "security token",
+            "digital securities",
+            "tokenized assets",
+            "asset backed token",
+            "commodity tokenization",
+            "STO platform",
+            "security token offering",
         ],
         
         # ============================================================
@@ -413,18 +504,29 @@ class ScrapingConfig:
     # ===================================================================
     
     # Default keywords (used if --service not specified)
+    # Optimized for Shamla Tech's RWA specialization
     keywords: list[str] = field(default_factory=lambda: [
-        # HELP-SEEKING keywords (Reddit-friendly)
-        "need",
-        "looking for",
-        "help",
-        "advice",
-        "recommend",
-        "suggestion"
+        # PRIMARY: RWA-specific terms
+        "tokenization",
+        "RWA",
+        "real world asset",
+        "asset tokenization",
+        "fractional ownership",
+        
+        # SECONDARY: Help-seeking with RWA context
+        "tokenize real estate",
+        "tokenize assets",
+        "need tokenization",
+        "tokenization platform",
+        
+        # TERTIARY: General help-seeking (fallback)
+        "looking for blockchain consultant",
+        "need blockchain developer",
     ])
     
     max_results_per_source: int = 100
     max_total_leads: int = 200  # Global limit - stops scraping after this many total leads
+    days_filter: int = config("DAYS_FILTER", default=7, cast=int)  # Universal date filter for all sources (0 = no filter)
     scrape_interval_seconds: int = 300  # 5 minutes
     enable_sentiment_filter: bool = True
     min_engagement_score: int = 0  # minimum upvotes/reactions (0 = allow posts with no engagement)
@@ -439,6 +541,10 @@ class AppSettings:
     linkedin_public: LinkedInPublicConfig = field(default_factory=LinkedInPublicConfig)
     linkedin_apify: LinkedInApifyConfig = field(default_factory=LinkedInApifyConfig)
     scraping: ScrapingConfig = field(default_factory=ScrapingConfig)
+    
+    # LinkedIn Playwright Settings
+    linkedin_cookie: str = config("LINKEDIN_COOKIE", default="")
+    linkedin_proxy: str = config("LINKEDIN_PROXY", default="")
     
     # LLM Qualification Settings
     openai_api_key: str = config("OPENAI_API_KEY", default="")

@@ -47,6 +47,13 @@ google-generativeai>=0.3.0  # Gemini API fallback
 # Used by excel_handler.py for exporting leads to Excel
 openpyxl>=3.1.0
 
+# Browser Automation
+# Playwright for LinkedIn scraping (anti-detection)
+playwright>=1.40.0
+
+# Selenium for LinkedIn scraping (alternative to Playwright)
+selenium>=4.16.0
+
 # Web Frontend
 # Flask for web UI
 Flask>=3.0.0

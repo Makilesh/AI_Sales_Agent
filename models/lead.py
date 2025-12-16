@@ -43,9 +43,10 @@ class Lead:
         
         if not self.content or not self.content.strip():
             raise ValueError("Content cannot be empty")
-        
+
+        # IMPROVED: Truncate long content instead of rejecting (Reddit posts can be very long)
         if len(self.content) > 10000:
-            raise ValueError("Content exceeds maximum length of 10000 characters")
+            self.content = self.content[:10000] + "... [content truncated]"
         
         if not self.url or not self.url.startswith(('http://', 'https://')):
             raise ValueError("Invalid URL format")
@@ -73,57 +74,97 @@ class Lead:
     def is_qualified(self, min_engagement: int = 1) -> bool:
         """
         Check if lead meets basic qualification criteria.
-        
-        Relaxed pre-validation to let more leads reach LLM:
-        - Min 10 words (catches brief service requests like "Need RWA dev. Budget $50k")
-        - Min engagement 1 (catches new posts)
-        - Spam filtering (basic checks for promotional content)
+
+        IMPROVED: Source-aware validation with stricter Reddit rules.
+        - Reddit: Min 12 words, subreddit-aware engagement (0-2+ based on subreddit type)
+        - Other sources: Min 10 words, engagement score 1+
+        - Spam filtering (enhanced checks for promotional content)
         """
-        # Filter 1: Minimum word count (lowered from 20 to 10 words)
+        # IMPROVED: Stricter source-aware rules
+        if self.source == 'reddit':
+            min_words = 12          # More substantive content required
+
+            # SUBREDDIT-AWARE: Different engagement thresholds by subreddit type
+            subreddit = self.subreddit or ""
+            HELP_SEEKING = ['forhire', 'slavelabour', 'Jobs4Bitcoins', 'hire']
+            is_help_subreddit = any(sub in subreddit.lower() for sub in HELP_SEEKING)
+
+            if is_help_subreddit:
+                min_engagement = 0  # OK to have 0 upvotes in r/forhire (fast responses)
+            else:
+                min_engagement = 2  # General subreddits need validation (2+ upvotes)
+        else:
+            min_words = 10
+            # Use the provided min_engagement parameter for other sources
+
+        # Filter 1: Minimum word count (source-aware)
         word_count = len(self.content.split())
-        if word_count < 10:
+        if word_count < min_words:
             return False
-        
-        # Filter 2: Minimum engagement score (catches new posts)
+
+        # Filter 2: Minimum engagement score (source-aware)
         if self.engagement_score < min_engagement:
             return False
-        
-        # Filter 3: Basic spam detection
+
+        # Filter 3: Enhanced spam detection
         if self._is_likely_spam():
             return False
-        
+
         return True
     
     def _is_likely_spam(self) -> bool:
         """
-        Basic spam detection to filter obvious promotional content.
+        Enhanced spam detection to filter obvious promotional content.
         Returns True if content is likely spam.
         """
         content_lower = self.content.lower()
-        
-        # Spam indicators
+
+        # IMPROVED: Expanded spam indicators
         spam_phrases = [
+            # Existing
             'click here', 'buy now', 'limited time offer', 'act now',
             'sign up today', 'free trial', 'no credit card', 'risk free',
             'dm for details', 'check out my', 'follow me', 'subscribe',
-            '🚀🚀🚀', '💰💰💰', 'crypto giveaway', 'airdrop', 'pump and dump'
+            '🚀🚀🚀', '💰💰💰', 'crypto giveaway', 'airdrop', 'pump and dump',
+
+            # NEW: Reddit-specific spam
+            'upvote this', 'upvote if you', 'join our discord', 'dm me',
+            'check my profile', 'check my page', 'visit my website',
+            'link in bio', 'comment below', 'drop a comment',
+            'follow for more', 'join our community', 'join us at',
+
+            # NEW: Crypto scams
+            'guaranteed profit', 'passive income', '100x', '1000x',
+            'to the moon', 'wen moon', 'wen lambo', 'rugpull',
+
+            # NEW: Self-promotion
+            'i just launched', 'i built this', 'my new app', 'my startup',
+            'our new platform', 'we just released', 'proud to share'
         ]
-        
-        # Check for multiple spam phrases
+
+        # IMPROVED: Lower threshold from 3 to 2
         spam_count = sum(1 for phrase in spam_phrases if phrase in content_lower)
-        
-        # If multiple spam indicators, likely spam
-        if spam_count >= 3:
+        if spam_count >= 2:
             return True
-        
+
+        # NEW: Check for excessive emoji (spam indicator)
+        emoji_count = sum(1 for char in self.content if ord(char) > 127)
+        if emoji_count > 10:  # More than 10 emojis = spam
+            return True
+
+        # NEW: Check for sketchy domains
+        sketchy_domains = ['.tk', '.ml', '.ga', '.cf', 'bit.ly', 'tinyurl.com']
+        if any(domain in content_lower for domain in sketchy_domains):
+            return True
+
         # Check for excessive promotional language
         promo_words = ['buy', 'sale', 'discount', 'offer', 'deal', 'free']
         promo_count = sum(1 for word in promo_words if word in content_lower)
-        
+
         # If content is short and heavily promotional, likely spam
         if word_count := len(self.content.split()) < 30 and promo_count >= 4:
             return True
-        
+
         return False
     
     def __repr__(self) -> str:

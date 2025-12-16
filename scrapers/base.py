@@ -10,16 +10,18 @@ from models.lead import Lead
 class BaseScraper(ABC):
     """Abstract base class for platform-specific scrapers."""
     
-    def __init__(self, keywords: list[str], rate_limit: int) -> None:
+    def __init__(self, keywords: list[str], rate_limit: int, days_filter: int = 30) -> None:
         """
         Initialize the scraper.
         
         Args:
             keywords: List of keywords to filter leads
             rate_limit: Maximum requests per time period (implementation-specific)
+            days_filter: Only include content from last N days (0 = no filter, default: 30)
         """
         self.keywords = keywords
         self.rate_limit = rate_limit
+        self.days_filter = days_filter
         self.last_request_time: datetime | None = None
         self._request_count = 0
     
@@ -40,6 +42,15 @@ class BaseScraper(ABC):
         
         text_lower = text.lower()
         return any(keyword.lower() in text_lower for keyword in self.keywords)
+    
+    def _is_within_date_range(self, content_date: datetime) -> bool:
+        """Check if content is within the date filter range."""
+        if self.days_filter <= 0:
+            return True  # No filter
+        
+        from datetime import timedelta
+        cutoff_date = datetime.now() - timedelta(days=self.days_filter)
+        return content_date >= cutoff_date
     
     async def _apply_rate_limit(self) -> None:
         """Apply rate limiting between requests."""

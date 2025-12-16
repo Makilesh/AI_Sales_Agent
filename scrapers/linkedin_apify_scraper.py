@@ -70,7 +70,8 @@ class LinkedInApifyScraper(BaseScraper):
         only_posts: bool = True,
         include_sponsored: bool = False,
         min_reactions: int = 0,
-        max_total_leads: int = 200  # Global limit across all keywords
+        max_total_leads: int = 200,  # Global limit across all keywords
+        days_filter: int = 30  # Only include posts from last N days (0 = no filter)
     ) -> None:
         """
         Initialize LinkedIn Apify scraper for SERVICE LEAD discovery.
@@ -92,12 +93,14 @@ class LinkedInApifyScraper(BaseScraper):
             include_sponsored: Include sponsored content
             min_reactions: Minimum reactions to consider
             max_total_leads: Global limit - stop scraping after this many total leads
+            days_filter: Only include posts from last N days (0 = no filter, default: 30)
         """
         super().__init__(keywords, rate_limit)
         self.apify_token = apify_token
         self.max_posts_per_keyword = max_posts_per_keyword
         self.max_total_leads = max_total_leads
         self.actor_id = actor_id
+        self.days_filter = days_filter
         self.linkedin_cookie = linkedin_cookie
         self.proxy_config = proxy_config
         self.scrape_posts = scrape_posts
@@ -132,6 +135,67 @@ class LinkedInApifyScraper(BaseScraper):
             print(f"✓ Apify token valid (User: {user.get('username', 'Unknown')})")
         except Exception as e:
             print(f"⚠️  Apify token test failed: {e}")
+            return False
+        
+        return True
+    
+    def _is_service_inquiry(self, text: str) -> bool:
+        """
+        STRICT filter: Only pass genuine buyer inquiries asking for help/services.
+        Block: news, education, promotion, job posts, thought leadership, announcements.
+        """
+        if not text:
+            return False
+        
+        text_lower = text.lower()
+        
+        # STRICT: Must have explicit help-seeking/buying phrases
+        inquiry_phrases = [
+            "looking for", "need help", "need a", "need to hire", "seeking",
+            "anyone know", "recommendations for", "suggestions for",
+            "can anyone recommend", "who can help", "looking to hire",
+            "need advice", "need assistance", "help with", "help me",
+            "struggling with", "having trouble", "can't figure out",
+            "budget for", "willing to pay", "price range", "cost estimate",
+            "rfp for", "request for proposal", "quotes for", "quotation for",
+            "vendor for", "service provider", "consultant needed",
+            "contractor needed", "freelancer needed"
+        ]
+        
+        has_inquiry = any(phrase in text_lower for phrase in inquiry_phrases)
+        if not has_inquiry:
+            return False
+        
+        # STRICT blockers - reject educational/news/promotional content
+        content_blockers = [
+            # Promotional/company announcements
+            "proud to announce", "excited to share", "thrilled to announce",
+            "we are pleased", "we're launching", "join us", "register now",
+            "check out our", "our platform", "our solution", "we provide",
+            "we offer", "our team", "our company", "partnership with",
+            "signed a deal", "collaborated with", "working with",
+            
+            # Educational/thought leadership (these dominate LinkedIn)
+            "imagine owning", "the future of", "is changing the way",
+            "is reshaping", "is transforming", "is redefining",
+            "will become", "is emerging as", "key trends",
+            "deep dive into", "just published", "my article",
+            "reflections from", "what's next for", "the next frontier",
+            "a convergence", "aligns with", "roadmap", "framework",
+            
+            # News/announcements
+            "acquired", "acquisition", "announced", "authorization",
+            "last week", "yesterday", "just over", "has officially",
+            "blackrock", "securitize", "kraken", "coinbase",
+            
+            # Job postings (hiring, not seeking service)
+            "we are hiring", "we're hiring", "job opening",
+            "position:", "location:", "duration:", "job description",
+            "send resumes to", "apply now", "submit your resume",
+            "candidates / vendors", "years experience", "yrs exp"
+        ]
+        
+        if any(blocker in text_lower for blocker in content_blockers):
             return False
         
         return True
@@ -185,16 +249,21 @@ class LinkedInApifyScraper(BaseScraper):
                 print(f"\n  [{idx}/{len(self.keywords)}] Keyword: '{keyword}' (budget: {posts_to_fetch} posts)")
                 leads = await self._scrape_keyword(keyword, posts_to_fetch)
                 
-                # Add service classification and filter duplicates
+                # Filter for service inquiries and add classification
                 unique_leads = []
                 for lead in leads:
                     if lead.url not in seen_urls:
-                        service_types = self._classify_service_type(lead.content + " " + (lead.title or ""))
-                        lead.metadata['service_types'] = service_types
-                        lead.metadata['service_inquiry'] = True
+                        # Check if it's actually a service inquiry
+                        full_text = lead.content + " " + (lead.title or "")
+                        is_inquiry = self._is_service_inquiry(full_text)
                         
-                        unique_leads.append(lead)
-                        seen_urls.add(lead.url)
+                        if is_inquiry:
+                            service_types = self._classify_service_type(full_text)
+                            lead.metadata['service_types'] = service_types
+                            lead.metadata['service_inquiry'] = True
+                            
+                            unique_leads.append(lead)
+                            seen_urls.add(lead.url)
                 
                 all_leads.extend(unique_leads)
                 duplicates = len(leads) - len(unique_leads)
@@ -218,24 +287,38 @@ class LinkedInApifyScraper(BaseScraper):
         try:
             # Build LinkedIn search URL for the keyword
             import urllib.parse
-            encoded_keyword = urllib.parse.quote(keyword)
+            
+            # For multi-word keywords, try just the most important word
+            # LinkedIn's search works better with simple terms
+            keyword_parts = keyword.split()
+            if len(keyword_parts) > 2:
+                # Use the most distinctive word (usually the last substantive word)
+                simple_keyword = keyword_parts[-1] if keyword_parts[-1] not in ['developer', 'consultant', 'engineer', 'project', 'platform', 'solution'] else keyword_parts[0]
+                print(f"     ℹ️  Simplifying '{keyword}' → '{simple_keyword}' for LinkedIn search")
+                search_term = simple_keyword
+            else:
+                search_term = keyword
+            
+            encoded_keyword = urllib.parse.quote(search_term)
             search_url = f"https://www.linkedin.com/search/results/content/?keywords={encoded_keyword}"
             
             # Detect actor type and configure input accordingly
-            if 'supreme_coder/linkedin-post' in self.actor_id:
-                # supreme_coder/linkedin-post actor - simple input, no cookies
+            if 'apify/linkedin-posts-scraper' in self.actor_id:
+                # apify/linkedin-posts-scraper (RECOMMENDED - most reliable)
+                run_input = {
+                    'startUrls': [{'url': search_url}],
+                    'resultsLimit': effective_limit
+                }
+            elif 'supreme_coder' in self.actor_id:
+                # supreme_coder/linkedin-post actor
                 run_input = {
                     'urls': [search_url],
                     'limit': effective_limit
                 }
-            elif 'apify/linkedin-posts-scraper' in self.actor_id:
-                # apify/linkedin-posts-scraper - different input format
-                run_input = {
-                    'searchUrls': [search_url],
-                    'maxPosts': effective_limit
-                }
             elif 'curious_coder' in self.actor_id:
                 # curious_coder actor - requires cookies
+                if not self.linkedin_cookie:
+                    print(f"     ⚠️  Warning: curious_coder actor requires LinkedIn cookie (li_at)")
                 run_input = {
                     'urls': [search_url],
                     'maxPosts': effective_limit,
@@ -243,7 +326,7 @@ class LinkedInApifyScraper(BaseScraper):
                         'name': 'li_at',
                         'value': self.linkedin_cookie,
                         'domain': '.linkedin.com'
-                    }],
+                    }] if self.linkedin_cookie else [],
                     'userAgent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                     'proxy': {
                         'useApifyProxy': True
@@ -252,10 +335,10 @@ class LinkedInApifyScraper(BaseScraper):
                     }
                 }
             else:
-                # Generic actor
+                # Generic fallback
                 run_input = {
-                    'urls': [search_url],
-                    'maxResults': effective_limit
+                    'startUrls': [{'url': search_url}],
+                    'maxItems': effective_limit
                 }
             
             print(f"     → Running Apify actor ({self.actor_id})...")
@@ -264,15 +347,23 @@ class LinkedInApifyScraper(BaseScraper):
             else:
                 print(f"        • Using LinkedIn authentication")
             print(f"        • Fetching up to {effective_limit} posts")
+            print(f"        • Search URL: {search_url}")
+            print(f"        • Actor input: {run_input}")
             
             # Run Apify actor (blocking call, wrap in thread)
-            run = await asyncio.to_thread(
-                self.client.actor(self.actor_id).call,
-                run_input=run_input
-            )
+            try:
+                run = await asyncio.to_thread(
+                    self.client.actor(self.actor_id).call,
+                    run_input=run_input
+                )
+                print(f"     → Actor run completed: {run.get('status', 'unknown')}")
+            except Exception as actor_error:
+                print(f"     ❌ Actor execution failed: {actor_error}")
+                print(f"        Tip: Check if actor '{self.actor_id}' exists at https://console.apify.com/")
+                raise
             
             # Fetch results from dataset
-            print(f"     → Fetching results from dataset...")
+            print(f"     → Fetching results from dataset ({run.get('defaultDatasetId', 'unknown')})...")
             dataset_items = await asyncio.to_thread(
                 self.client.dataset(run['defaultDatasetId']).list_items
             )
@@ -287,7 +378,19 @@ class LinkedInApifyScraper(BaseScraper):
             
             print(f"     → Found {len(items)} raw items from Apify")
             
+            if len(items) == 0:
+                print(f"     ⚠️  No items returned from Apify actor")
+                print(f"        Possible reasons:")
+                print(f"        1. Keyword '{keyword}' has no matching LinkedIn posts")
+                print(f"        2. Actor configuration issue (check input format)")
+                print(f"        3. LinkedIn rate limiting or blocking")
+                print(f"        4. Apify actor may require authentication")
+                print(f"        5. Try simpler keywords (single words work best)")
+                print(f"     💡 Debug: Check run at https://console.apify.com/actors/runs/{run.get('id', 'unknown')}")
+                return []
+            
             # Parse each item
+            filtered_by_date = 0
             for item in items:
                 try:
                     # Filter by content type
@@ -299,6 +402,30 @@ class LinkedInApifyScraper(BaseScraper):
                         continue
                     if item_type in ['discussion', 'thread'] and not self.scrape_discussions:
                         continue
+                    
+                    # Filter by date (if days_filter is set)
+                    if self.days_filter > 0:
+                        post_date = item.get('postedAt') or item.get('date') or item.get('createdAt')
+                        if post_date:
+                            try:
+                                from datetime import timedelta
+                                # Try parsing different date formats
+                                if isinstance(post_date, str):
+                                    # Parse ISO format or timestamp
+                                    if 'T' in post_date:
+                                        post_datetime = datetime.fromisoformat(post_date.replace('Z', '+00:00'))
+                                    else:
+                                        post_datetime = datetime.strptime(post_date, '%Y-%m-%d')
+                                else:
+                                    post_datetime = datetime.fromtimestamp(post_date)
+                                
+                                cutoff_date = datetime.now() - timedelta(days=self.days_filter)
+                                if post_datetime < cutoff_date:
+                                    filtered_by_date += 1
+                                    continue
+                            except Exception as date_error:
+                                # If date parsing fails, include the post (don't filter out)
+                                pass
                     
                     # Filter by reaction count
                     reactions_total = item.get('reactions', {}).get('total', 0) if isinstance(item.get('reactions'), dict) else 0
@@ -313,6 +440,10 @@ class LinkedInApifyScraper(BaseScraper):
                         leads.append(lead)
                 except Exception as e:
                     continue
+            
+            # Show date filtering stats
+            if filtered_by_date > 0:
+                print(f"     🗓️  Filtered out {filtered_by_date} posts older than {self.days_filter} days")
         
         except Exception as e:
             print(f"     ⚠️  Apify API error: {e}")

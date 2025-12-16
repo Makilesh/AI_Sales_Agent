@@ -49,9 +49,12 @@ def run_async_in_thread(coro):
 
 
 async def run_scraper(source: str, keywords: list[str]) -> list[Lead]:
-    """Run a single scraper."""
+    """Run a single scraper with timeout and error handling."""
     try:
         if source == 'reddit':
+            if not settings.reddit.client_id or not settings.reddit.client_secret:
+                print(f"⚠️ Reddit credentials not configured")
+                return []
             scraper = RedditScraper(
                 client_id=settings.reddit.client_id,
                 client_secret=settings.reddit.client_secret,
@@ -60,25 +63,32 @@ async def run_scraper(source: str, keywords: list[str]) -> list[Lead]:
                 subreddits=settings.reddit.subreddits,
                 rate_limit=settings.reddit.rate_limit
             )
-            return await scraper.scrape_with_rate_limit()
+            # Add 5-minute timeout per source
+            return await asyncio.wait_for(scraper.scrape_with_rate_limit(), timeout=300)
         
         elif source == 'discord':
+            if not settings.discord.bot_token:
+                print(f"⚠️ Discord bot token not configured")
+                return []
             scraper = DiscordScraper(
                 bot_token=settings.discord.bot_token,
                 keywords=keywords,
                 channel_ids=settings.discord.channels,
                 rate_limit=settings.discord.rate_limit
             )
-            return await scraper.scrape_with_rate_limit()
+            return await asyncio.wait_for(scraper.scrape_with_rate_limit(), timeout=300)
         
         elif source == 'slack':
+            if not settings.slack.bot_token:
+                print(f"⚠️ Slack bot token not configured")
+                return []
             scraper = SlackScraper(
                 bot_token=settings.slack.bot_token,
                 keywords=keywords,
                 channel_ids=settings.slack.channels,
                 rate_limit=settings.slack.rate_limit
             )
-            return await scraper.scrape_with_rate_limit()
+            return await asyncio.wait_for(scraper.scrape_with_rate_limit(), timeout=300)
         
         elif source == 'linkedin_public':
             if settings.linkedin_public.enabled:
@@ -92,6 +102,9 @@ async def run_scraper(source: str, keywords: list[str]) -> list[Lead]:
         
         elif source == 'linkedin_apify':
             if settings.linkedin_apify.enabled:
+                if not settings.linkedin_apify.apify_token:
+                    print(f"⚠️ LinkedIn Apify token not configured")
+                    return []
                 scraper = LinkedInApifyScraper(
                     apify_token=settings.linkedin_apify.apify_token,
                     keywords=keywords,
@@ -100,13 +113,17 @@ async def run_scraper(source: str, keywords: list[str]) -> list[Lead]:
                     actor_id=settings.linkedin_apify.actor_id,
                     linkedin_cookie=settings.linkedin_apify.linkedin_cookie,
                     proxy_config=settings.linkedin_apify.proxy_config,
-                    max_total_leads=settings.scraping.max_total_leads
+                    max_total_leads=settings.scraping.max_total_leads,
+                    days_filter=settings.linkedin_apify.days_filter
                 )
-                return await scraper.scrape_with_rate_limit()
+                return await asyncio.wait_for(scraper.scrape_with_rate_limit(), timeout=300)
             return []
         
+    except asyncio.TimeoutError:
+        print(f"⏱️ {source}: Scraping timeout (5 minutes)")
+        return []
     except Exception as e:
-        print(f"Error scraping {source}: {e}")
+        print(f"❌ {source}: Scraping failed - {str(e)}")
         return []
 
 
@@ -151,6 +168,7 @@ def start_scrape():
     max_leads = data.get('max_leads', 200)
     qualify = data.get('qualify', False)
     filter_service = data.get('filter_service', None)
+    days_filter = data.get('days_filter', 30)  # Date filter for LinkedIn
     
     if not sources:
         return jsonify({'error': 'No sources selected'}), 400
@@ -174,6 +192,7 @@ def start_scrape():
         'max_leads': max_leads,
         'qualify': qualify,
         'filter_service': filter_service,
+        'days_filter': days_filter,
         'started_at': datetime.now().isoformat(),
         'progress': 0,
         'leads_found': 0,
@@ -181,7 +200,7 @@ def start_scrape():
     }
     
     # Run scraping in background
-    run_async_in_thread(run_scraping_job(job_id, sources, keywords, max_leads, qualify, filter_service))
+    run_async_in_thread(run_scraping_job(job_id, sources, keywords, max_leads, qualify, filter_service, days_filter))
     
     return jsonify({
         'job_id': job_id,
@@ -190,11 +209,13 @@ def start_scrape():
     })
 
 
-async def run_scraping_job(job_id: str, sources: list, keywords: list, max_leads: int, qualify: bool, filter_service: str):
+async def run_scraping_job(job_id: str, sources: list, keywords: list, max_leads: int, qualify: bool, filter_service: str, days_filter: int = 30):
     """Run scraping job in background."""
     try:
-        # Update max leads
+        # Update max leads and days filter (universal for all sources)
         settings.scraping.max_total_leads = max_leads
+        settings.scraping.days_filter = days_filter  # Universal days filter
+        settings.linkedin_apify.days_filter = days_filter  # LinkedIn-specific (kept for backward compat)
         
         # Run scrapers concurrently
         tasks = [run_scraper(source, keywords) for source in sources]
@@ -214,12 +235,11 @@ async def run_scraping_job(job_id: str, sources: list, keywords: list, max_leads
         append_leads(all_leads, output_file)
         scraping_jobs[job_id]['output_file'] = output_file
         
-        # ALWAYS export all leads to Excel (even without qualification)
-        if all_leads:
-            from storage.excel_handler import export_all_leads_to_excel
-            all_leads_excel = f"data/all_leads_{job_id}.xlsx"
-            export_all_leads_to_excel(all_leads, all_leads_excel)
-            scraping_jobs[job_id]['all_leads_excel'] = all_leads_excel
+        # ALWAYS export all leads to Excel (even if empty)
+        from storage.excel_handler import export_all_leads_to_excel
+        all_leads_excel = f"data/all_leads_{job_id}.xlsx"
+        export_all_leads_to_excel(all_leads, all_leads_excel)
+        scraping_jobs[job_id]['all_leads_excel'] = all_leads_excel
         
         # Qualify if requested
         if qualify and all_leads:
@@ -298,11 +318,7 @@ def download_file(job_id, file_type):
     if file_type == 'json' and 'output_file' in job:
         return send_file(job['output_file'], as_attachment=True)
     elif file_type == 'excel' and 'excel_file' in job:
-        # Qualified leads Excel (only if AI qualification was enabled)
         return send_file(job['excel_file'], as_attachment=True)
-    elif file_type == 'excel_all' and 'all_leads_excel' in job:
-        # All leads Excel (always available)
-        return send_file(job['all_leads_excel'], as_attachment=True)
     else:
         return jsonify({'error': 'File not found'}), 404
 
