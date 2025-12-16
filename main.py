@@ -352,6 +352,11 @@ def main():
         help='Global limit - stop after this many leads (default: 500, optimized from 200)'
     )
     parser.add_argument(
+        '--days-filter',
+        type=int,
+        help='Only include content from last N days (default: 30 days, 0 = no filter)'
+    )
+    parser.add_argument(
         '--output',
         type=str,
         default='data/leads.json',
@@ -416,6 +421,10 @@ def main():
     # Apply global limit if specified
     if args.max_total_leads:
         settings.scraping.max_total_leads = args.max_total_leads
+    
+    # Apply days filter if specified
+    if args.days_filter is not None:
+        settings.scraping.days_filter = args.days_filter
     
     print("=" * 60)
     print("Multi-Source Lead Scraping Engine - Phase 1")
