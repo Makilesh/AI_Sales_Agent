@@ -132,10 +132,12 @@ Contains help-seeking phrase + describes relevant need:
    • Contract language: "/month", "/hour", "contract for"
 
 **Option 3: IMPLICIT SERVICE NEED** (Problem + Context)
+   • "How do I/we [task]" + business context (budget/timeline/team)
    • States problem/challenge + mentions budget/timeline
    • "Struggling with X" + shows business context
    • "Our project needs X" + implies external help
    • Technical problem + team lacks expertise
+   • Evaluation language: "considering", "exploring", "evaluating" + specific tech
 
 Examples QUALIFIED:
 ✓ "Looking for a blockchain consultant to help tokenize our real estate portfolio"
@@ -144,6 +146,9 @@ Examples QUALIFIED:
 ✓ "Struggling with tokenization. Budget: $50k, timeline: Q1"
 ✓ "Our RWA project is stuck. Team doesn't have blockchain expertise."
 ✓ "Best service for tokenizing real estate assets?"
+✓ "How do I tokenize real estate? Budget: $50k, need by Q1" (implicit + context)
+✓ "Exploring RWA platforms for our fund. Timeline: 3 months" (evaluation + timeline)
+✓ "What's the best way to tokenize properties? Team has no blockchain experience" (question + context)
 
 ✅ **PRIORITY LEADS - Competitor Frustration:**
 ✓ "Antier Solutions too expensive, need cheaper RWA tokenization alternative"
@@ -155,16 +160,19 @@ Examples QUALIFIED:
 
 **These get +0.2 confidence boost** as they're actively seeking to change providers!
 
-⚠️ MODERATE (0.4-0.7) - UNCERTAIN BUT CONSIDER:
-- Vague "how to" but shows business context (not just learning)
-- Discusses challenges + budget/timeline mentioned
-- Educational questions but implies hiring consideration
-- Problem statement without explicit help request
+⚠️ MODERATE (0.5-0.75) - QUALIFY WITH LOWER CONFIDENCE:
+- "How to" questions + business context (budget/timeline/team) → 0.6-0.7
+- Problem statement + budget/timeline mentioned → 0.65
+- Evaluation: "considering", "exploring", "evaluating" + specific tech → 0.6
+- Discusses challenges + mentions business context → 0.55
+- "Any advice/tips" + shows business context → 0.5
 
-Examples MODERATE:
-≈ "How to tokenize real estate? Budget considerations?" → 0.5 (shows intent but vague)
-≈ "Tokenization seems complex. Any tips?" → 0.4 (might convert to client)
-≈ "Our team is evaluating RWA platforms" → 0.6 (evaluation = potential buyer)
+Examples MODERATE (still qualify, just lower confidence):
+≈ "How to tokenize real estate? Budget: $50k" → 0.65 (how-to + budget = qualify)
+≈ "Exploring RWA platforms for our fund" → 0.6 (evaluation = buyer intent)
+≈ "Our team is considering tokenization. Timeline: Q1" → 0.6 (evaluation + timeline)
+≈ "Tokenization seems complex. Budget considerations?" → 0.55 (shows business thinking)
+≈ "Any advice on tokenizing assets? Our team stuck" → 0.5 (advice + team context)
 
 ❌ LOW (0.0-0.3) - DO NOT QUALIFY:
 - Pure discussion/learning (no business context)
@@ -184,10 +192,12 @@ Examples NOT QUALIFIED:
 
 **CRITICAL RULES:**
 1. Qualify if EXPLICIT help-seeking OR strong buying signal OR implicit need with business context
-2. Quote the specific help-seeking phrase or buying signal found in your reason
-3. Buying signals ([Hiring], Budget, ASAP, RFP) = automatic qualification
-4. Problem + business context (budget/timeline/team) = qualified
-5. Pure discussion/learning WITHOUT business context = not qualified
+2. "How to" questions + business context (budget/timeline/team) = QUALIFY at 0.6-0.7 confidence
+3. Evaluation language ("considering", "exploring", "evaluating") + specific tech = QUALIFY at 0.6
+4. Buying signals ([Hiring], Budget, ASAP, RFP) = automatic high confidence qualification
+5. Problem + business context (budget/timeline/team) = qualified at 0.65
+6. Pure discussion/learning WITHOUT any business context = not qualified
+7. Quote the specific phrase or signal found in your reason
 
 Response JSON (no markdown):
 {{
@@ -915,25 +925,9 @@ CRITICAL: Return exactly {len(leads)} results in the same order as the leads abo
                 "skipped_llm": True
             }
         
-        # Check for explicit help-seeking phrases
-        has_help_phrase, _ = self._contains_help_seeking_phrase(lead.content)
-        
-        # CHANGED: Instead of hard rejection, just add context for LLM
-        # Let borderline cases through to LLM for evaluation
-        if not has_help_phrase:
-            # Still check for implicit inquiry signals
-            if self._has_implicit_inquiry_signals(lead.content):
-                # Let LLM decide - could be valid implicit inquiry
-                pass  # Continue to LLM call
-            else:
-                # No explicit or implicit signals - likely just discussion
-                return {
-                    "is_qualified": False,
-                    "confidence_score": 0.0,
-                    "reason": "No help-seeking phrase or inquiry signals detected",
-                    "service_match": [],
-                    "skipped_llm": True
-                }
+        # SIMPLIFIED: Remove strict pre-filter, let LLM decide
+        # The Reddit soft filter + spam detection already removed obvious junk
+        # Pre-filtering was causing more harm (rejecting valid implicit inquiries)
         
         # If validations pass, proceed with LLM call
         try:
