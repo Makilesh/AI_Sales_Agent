@@ -64,26 +64,43 @@ class LLMLeadQualifier:
         if lead.source == 'reddit' and lead.metadata.get('targeted_search'):
             search_boost = f"🎯 High-intent search lead (phrase: '{lead.metadata.get('search_phrase', '')}'). +0.15 confidence if qualified. "
 
-        prompt = f"""Qualify lead for Shamla Tech (Web3/RWA/Blockchain/AI firm). {service_filter}{search_boost}
+        # Build service-specific context
+        if self.target_service == 'RWA' or (service_filter and 'RWA' in service_filter):
+            service_context = """**Shamla Tech RWA Services:**
+- Real estate tokenization (commercial/residential property fractionalization)
+- Asset tokenization platforms (art, commodities, securities)
+- Security Token Offerings (STO) infrastructure
+- Fractional ownership solutions
+- Compliant tokenization (SEC/regulatory)
+
+**ONLY qualify if:** Business/individual wants to TOKENIZE their assets or BUILD tokenization platform. NOT job posts, NOT offering services."""
+        else:
+            service_context = "**Services:** RWA Tokenization, Crypto/Web3, Blockchain, AI/ML"
+
+        prompt = f"""Qualify lead for Shamla Tech (India-based Web3/RWA firm). {service_filter}{search_boost}
 
 **Lead:** {full_text}
 
-**Services:** RWA Tokenization, Crypto/Web3, Blockchain, AI/ML
+{service_context}
 
 **Qualify if ANY:**
-1. EXPLICIT: "looking for", "need help", "recommend", "seeking", "[hiring]", "best [tool] for"
-2. BUYING SIGNALS: Budget mentions, urgency (ASAP), timeline, RFP, contract terms
-3. IMPLICIT: Problem + context (budget/timeline/team lack expertise)
+1. EXPLICIT BUYER: "tokenize my/our [asset]", "need tokenization for", "looking for RWA platform"
+2. BUYING SIGNALS: Budget, timeline, "how much to tokenize", RFP, evaluation phase
+3. PROBLEM: "want to fractionalize", "enable fractional ownership", "compliant tokenization"
+
+**REJECT:**
+- Job posts: "[Hiring]", "we are hiring", "apply now"
+- Service providers: "[For Hire]", "I offer", "my services"
+- Discussions/news: No clear business need
+- Wrong industry: Software jobs, marketing, design (unless blockchain-related)
 
 **Confidence:**
-- 0.8-1.0: Explicit help-seeking or strong buying signals
-- 0.6-0.75: Implicit (how-to + budget/timeline, evaluation language)
-- 0.5-0.6: Weak context signals
-- 0.0-0.3: Discussion, news, self-promotion (reject)
+- 0.85-1.0: "I want to tokenize [my asset]" with specifics
+- 0.7-0.85: "How to tokenize" + business context (budget/timeline/company mentioned)
+- 0.5-0.7: Implicit need (fractional ownership interest + asset type)
+- 0.0-0.5: Reject (no clear buyer intent)
 
-**Reject:** Pure learning, opinions, announcements, spam (no business context)
-
-JSON: {{"is_qualified": true/false, "confidence_score": 0.0-1.0, "reason": "quoted phrase or why not", "service_match": ["RWA Tokenization"]}}"""
+JSON: {{"is_qualified": true/false, "confidence_score": 0.0-1.0, "reason": "quoted phrase showing buyer intent", "service_match": ["RWA Tokenization"]}}"""
 
         return prompt
     
@@ -111,13 +128,24 @@ JSON: {{"is_qualified": true/false, "confidence_score": 0.0-1.0, "reason": "quot
             return False, "spam/self-promotion (2+ indicators)"
 
         # BLOCK 2: Job postings (company hiring, not seeking service)
-        hiring_phrases = [
-            "we are hiring", "we're hiring", "apply now",
-            "submit your resume", "send cv to", "years experience required"
+        # Single strong indicator is enough
+        hiring_indicators = [
+            "[hiring]", "we are hiring", "we're hiring", "apply now",
+            "submit your resume", "send cv to", "years experience required",
+            "remote work in the ai", "earn $", "weekly ai projects"
         ]
-        hiring_count = sum(1 for phrase in hiring_phrases if phrase in full_text)
-        if hiring_count >= 2:
+        if any(indicator in full_text for indicator in hiring_indicators):
             return False, "job posting (company hiring)"
+        
+        # BLOCK 3: Service providers offering services (not seeking)
+        # These are freelancers/agencies promoting themselves
+        offering_indicators = [
+            "[for hire]", "i offer", "my services include",
+            "i can help with", "i specialize in", "my expertise",
+            "portfolio:", "dm me for", "contact me at"
+        ]
+        if any(indicator in full_text for indicator in offering_indicators):
+            return False, "service provider (offering services)"
 
         # ALLOW: Everything else goes to LLM
         # Let LLM decide on borderline cases instead of aggressive pre-filtering

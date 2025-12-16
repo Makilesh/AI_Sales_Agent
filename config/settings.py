@@ -176,7 +176,7 @@ class ScrapingConfig:
         ],
         
         # ============================================================
-        # 2. RWA TOKENIZATION (cross-platform)
+        # 2. RWA TOKENIZATION (cross-platform) - BUYER-FOCUSED
         # ============================================================
         'rwa': [
             "tokenization consultant", "RWA developer",
