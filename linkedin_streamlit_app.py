@@ -1,0 +1,402 @@
+"""
+LinkedIn Lead Scraper - Streamlit App
+A web-based interface for scraping and analyzing LinkedIn leads.
+"""
+
+import os
+import streamlit as st
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.common.exceptions import NoSuchElementException, TimeoutException, StaleElementReferenceException
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from bs4 import BeautifulSoup
+import pandas as pd
+from datetime import datetime
+import time
+from openai import OpenAI
+import random
+from dotenv import load_dotenv
+import gc
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
+
+# Load environment variables
+load_dotenv()
+
+# Configure the OpenAI API
+# Use environment variable for security
+openai_api_key = os.getenv('OPENAI_API_KEY', '')
+if openai_api_key:
+    client = OpenAI(api_key=openai_api_key)
+else:
+    st.error("OPENAI_API_KEY not found in .env file")
+    st.stop()
+
+# Set page config to wide mode
+st.set_page_config(layout="wide", page_title="LinkedIn Lead Scraper")
+
+# Custom CSS to ensure full width
+st.markdown("""
+<style>
+    .reportview-container .main .block-container {
+        max-width: 1000px;
+        padding-top: 1rem;
+        padding-right: 1rem;
+        padding-left: 1rem;
+        padding-bottom: 1rem;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+
+def login_to_linkedin(driver, username, password):
+    """Login to LinkedIn using username and password."""
+    try:
+        driver.get("https://www.linkedin.com/login")
+        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "username")))
+        username_field = driver.find_element(By.ID, "username")
+        password_field = driver.find_element(By.ID, "password")
+        username_field.send_keys(username)
+        password_field.send_keys(password)
+        password_field.send_keys(Keys.RETURN)
+        WebDriverWait(driver, 10).until(EC.url_contains("feed"))
+
+        if "checkpoint" in driver.current_url:
+            st.error("Manual verification required. Please complete the verification in the browser.")
+            st.stop()
+        return True
+    except Exception as e:
+        st.error(f"Login failed: {e}")
+        return False
+
+
+def search_and_scroll(driver, keyword, max_scroll_attempts=50):
+    """Search for keyword and scroll through results."""
+    all_posts = []
+    search_url = f"https://www.linkedin.com/search/results/content/?keywords={keyword}&origin=GLOBAL_SEARCH_HEADER"
+    driver.get(search_url)
+
+    scroll_attempts = 0
+
+    with st.empty():
+        while scroll_attempts < max_scroll_attempts:
+            st.info(f"Scrolling attempt {scroll_attempts + 1}...")
+
+            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            time.sleep(random.uniform(4, 6))
+
+            try:
+                show_more_button = driver.find_element(By.XPATH,
+                                                       "//button[contains(@class, 'scaffold-finite-scroll__load-button')]")
+                if show_more_button.is_displayed():
+                    st.info("Clicking 'Show more results' button.")
+                    show_more_button.click()
+                    time.sleep(random.uniform(2, 4) + 5)
+                else:
+                    st.success("Reached the end of results. Stopping scroll.")
+                    break
+            except NoSuchElementException:
+                st.success("Reached the end of results. Stopping scroll.")
+                break
+            except StaleElementReferenceException:
+                st.info("Encountered a stale element. Retrying...")
+
+            page_posts = extract_post_info(driver.page_source)
+            all_posts.extend(page_posts)
+
+            scroll_attempts += 1
+
+    return all_posts
+
+
+def extract_post_info(html):
+    """Extract post information from HTML."""
+    soup = BeautifulSoup(html, 'html.parser')
+    posts = []
+    post_elements = soup.find_all('div', class_='feed-shared-update-v2')
+
+    st.info(f"Found {len(post_elements)} post elements on this page")
+
+    for post in post_elements:
+        try:
+            profile_link = post.find('a', class_='app-aware-link update-components-actor__meta-link')
+            if not profile_link:
+                continue
+
+            profile_url = profile_link.get('href', '')
+            profile_name = profile_link.find('span', class_='update-components-actor__name')
+            profile_name = profile_name.text.strip() if profile_name else "Name not found"
+
+            profile_title = profile_link.find('span', class_='update-components-actor__description')
+            profile_title = profile_title.text.strip() if profile_title else "Title not found"
+
+            connection_degree = profile_link.find('span', class_='update-components-actor__supplementary-actor-info')
+            connection_degree = connection_degree.text.strip() if connection_degree else "Connection degree not found"
+
+            timestamp = post.find('span', class_='update-components-actor__sub-description')
+            timestamp = timestamp.text.strip() if timestamp else "Timestamp not found"
+
+            content_section = post.find('div', class_='feed-shared-update-v2__description-wrapper')
+            content = content_section.text.strip() if content_section else "No content"
+
+            hashtags = [tag.text for tag in
+                        post.find_all('a', class_='feed-shared-text-view__mention')] if content_section else []
+
+            posts.append({
+                'Profile Name': profile_name,
+                'Profile Title': profile_title,
+                'Profile URL': profile_url,
+                'Connection Degree': connection_degree,
+                'Timestamp': timestamp,
+                'Content': content,
+                'Hashtags': ', '.join(hashtags)
+            })
+
+        except AttributeError as e:
+            st.error(f"Error extracting post data: {e}")
+
+    return posts
+
+
+def analyze_lead_potential(content, keywords):
+    """Analyze if content indicates a potential lead."""
+    keyword_prompt = ", ".join(keywords)
+
+    prompt = f"""
+    Analyze the following LinkedIn post content. Determine if it indicates a potential client requirement for any products or services related to these keywords: {keyword_prompt}.
+
+    Important:
+    1. Classify as a potential lead ONLY if the post clearly indicates a need for external services without offering to provide those services themselves.
+    2. Do not classify as a lead if the post is:
+       - From a job seeker looking for employment
+       - From an individual or company promoting or offering their own services
+       - General informational content without a clear need for services
+    3. Pay close attention to language that suggests the poster is offering services rather than seeking them.
+
+    Post Content:
+    {content}
+
+    Respond with:
+    1. 'True' if there's a potential lead (client looking for external services), or 'False' if not.
+    2. A list of matched keywords (if any).
+    3. A brief explanation for your decision, including the nature of the post (e.g., service request, job seeking, service promotion, or informational).
+
+    Format your response as:
+    Potential Lead: [True/False]
+    Matched Keywords: [list of matched keywords]
+    Explanation: [your explanation]
+    """
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system",
+                 "content": "You are a helpful assistant that analyzes LinkedIn posts for lead potential, focusing on clear indications of need for external services while carefully distinguishing from promotional content."},
+                {"role": "user", "content": prompt}
+            ]
+        )
+
+        analysis = response.choices[0].message.content
+
+        lines = analysis.split('\n')
+        is_potential_lead = lines[0].split(':')[1].strip().lower() == 'true'
+        matched_keywords = lines[1].split(':')[1].strip()
+        explanation = lines[2].split(':')[1].strip()
+
+        return is_potential_lead, matched_keywords, explanation
+    except Exception as e:
+        st.error(f"Error in lead potential analysis: {e}")
+        return False, "", "Error in analysis"
+
+
+def send_email(subject, body, sender_email, sender_password, recipient_email, attachments):
+    """Send email with attachments."""
+    try:
+        message = MIMEMultipart()
+        message['From'] = sender_email
+        message['To'] = recipient_email
+        message['Subject'] = subject
+
+        message.attach(MIMEText(body, 'plain'))
+
+        for attachment_file in attachments:
+            with open(attachment_file, "rb") as attachment:
+                part = MIMEBase('application', 'octet-stream')
+                part.set_payload(attachment.read())
+                encoders.encode_base64(part)
+                part.add_header('Content-Disposition', f'attachment; filename={os.path.basename(attachment_file)}')
+                message.attach(part)
+
+        with smtplib.SMTP('smtp.gmail.com', 587) as session:
+            session.starttls()
+            session.login(sender_email, sender_password)
+            text = message.as_string()
+            session.sendmail(sender_email, recipient_email, text)
+
+        return True
+
+    except smtplib.SMTPAuthenticationError:
+        st.error("SMTP Authentication Error: Please check your email and password in the .env file.")
+    except smtplib.SMTPException as e:
+        st.error(f"SMTP Error: {str(e)}")
+    except Exception as e:
+        st.error(f"An unexpected error occurred: {str(e)}")
+
+    return False
+
+
+def filter_duplicate_posts(posts):
+    """Remove duplicate posts based on profile name, URL, and content."""
+    seen = set()
+    unique_posts = []
+    for post in posts:
+        post_key = (post['Profile Name'], post['Profile URL'], post['Content'][:100])
+        if post_key not in seen:
+            seen.add(post_key)
+            unique_posts.append(post)
+    return unique_posts
+
+
+def main():
+    """Main Streamlit application."""
+    st.header("LinkedIn Lead Scraper")
+
+    # Sidebar for inputs
+    with st.sidebar:
+        st.text("")
+        st.text("")
+        linkedin_username = st.text_input("LinkedIn Username", value="fatbatman85@gmail.com")
+        linkedin_password = st.text_input("LinkedIn Password", type="password", value="makilesh")
+        keywords = st.text_input("Keywords (comma-separated)", value="RWA, tokenization, blockchain")
+        max_scroll_attempts = st.number_input("Max Scroll Attempts", min_value=1, value=5)
+        start_scraping = st.button("Start Scraping", use_container_width=True)
+
+    # Main content area
+    if start_scraping:
+        if not linkedin_username or not linkedin_password:
+            st.error("Please provide LinkedIn username and password")
+            st.stop()
+            
+        if not keywords:
+            st.error("Please provide at least one keyword")
+            st.stop()
+
+        chrome_options = Options()
+        chrome_options.add_argument("--headless")
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+        chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        chrome_options.add_experimental_option('useAutomationExtension', False)
+        
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=chrome_options)
+        
+        all_posts = []
+
+        try:
+            with st.spinner("Logging in to LinkedIn..."):
+                if not login_to_linkedin(driver, linkedin_username, linkedin_password):
+                    st.stop()
+            st.success("Successfully logged in to LinkedIn")
+
+            keyword_list = [k.strip() for k in keywords.split(',')]
+
+            for keyword in keyword_list:
+                st.info(f"Searching for keyword: {keyword}")
+                posts = search_and_scroll(driver, keyword, max_scroll_attempts)
+                all_posts.extend(posts)
+                time.sleep(random.uniform(5, 10))
+
+            unique_posts = filter_duplicate_posts(all_posts)
+            st.success(f"Total unique posts extracted: {len(unique_posts)}")
+
+            if not unique_posts:
+                st.warning("No posts found. Try different keywords or increase scroll attempts.")
+                return
+
+            with st.spinner("Analyzing lead potential..."):
+                for post in unique_posts:
+                    post['Is Potential Lead'], post['Matched Keywords'], post['Lead Analysis'] = analyze_lead_potential(
+                        post['Content'], keyword_list)
+
+            posts_df = pd.DataFrame(unique_posts)
+
+            # Display all posts
+            st.subheader("All Posts")
+            st.dataframe(posts_df, use_container_width=True)
+
+            # Save the complete DataFrame to an Excel file
+            complete_filename = f"linkedin_posts_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+            posts_df.to_excel(complete_filename, index=False)
+
+            # Filter to keep only the leads
+            leads_df = posts_df[posts_df['Is Potential Lead'] == True]
+
+            # Display leads
+            st.subheader("Potential Leads")
+            if not leads_df.empty:
+                st.dataframe(leads_df, use_container_width=True)
+            else:
+                st.info("No potential leads found in the posts.")
+
+            # Save the filtered DataFrame to an Excel file if it contains leads
+            if not leads_df.empty:
+                leads_filename = f"linkedin_leads_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+                leads_df.to_excel(leads_filename, index=False)
+
+                # Add download buttons
+                col1, col2 = st.columns(2)
+                with col1:
+                    with open(complete_filename, "rb") as file:
+                        st.download_button(
+                            label="Download All Posts",
+                            data=file.read(),
+                            file_name=complete_filename,
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            use_container_width=True
+                        )
+                with col2:
+                    with open(leads_filename, "rb") as file:
+                        st.download_button(
+                            label="Download Potential Leads",
+                            data=file.read(),
+                            file_name=leads_filename,
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            use_container_width=True
+                        )
+            else:
+                st.warning("No potential leads found.")
+                # Add download button for all posts
+                with open(complete_filename, "rb") as file:
+                    st.download_button(
+                        label="Download All Posts",
+                        data=file.read(),
+                        file_name=complete_filename,
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True
+                    )
+
+        except Exception as e:
+            st.error(f"An error occurred: {e}")
+            import traceback
+            st.error(traceback.format_exc())
+        finally:
+            try:
+                driver.quit()
+            except:
+                pass
+            gc.collect()
+
+
+if __name__ == "__main__":
+    main()
