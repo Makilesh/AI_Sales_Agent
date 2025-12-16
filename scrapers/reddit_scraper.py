@@ -71,24 +71,103 @@ class RedditScraper(BaseScraper):
 
     def _filter_leads(self, leads: list[Lead]) -> list[Lead]:
         """
-        Filter leads by keywords (optional for Reddit).
+        Smart keyword filtering for Reddit.
 
-        Reddit targets help-seeking subreddits, so keyword filtering is optional.
-        When skip_keyword_filter=True, all posts from target subreddits pass through.
-        When skip_keyword_filter=False, applies parent class keyword filtering.
+        Strategy:
+        - When skip_keyword_filter=True: Apply soft filter (removes obvious non-inquiries)
+        - When skip_keyword_filter=False: Apply strict keyword matching
+        - Keeps all potential service requests while filtering spam/news/self-promotion
 
         Returns:
             Filtered list of leads
         """
-        # FIX: Conditional keyword filtering based on flag
         if self.skip_keyword_filter:
-            print(f"   🔍 Reddit: Keyword filter disabled (trusting help-seeking subreddits) - {len(leads)} leads passed")
-            return leads
+            # Apply soft filtering even when "disabled"
+            # Removes obvious non-inquiries without requiring keyword match
+            filtered = [lead for lead in leads if self._is_potential_inquiry(lead)]
+            removed = len(leads) - len(filtered)
+            if removed > 0:
+                print(f"   🔍 Reddit: Soft filter removed {removed} obvious non-inquiries ({len(filtered)} passed)")
+            else:
+                print(f"   🔍 Reddit: Soft filter - {len(leads)} potential inquiries passed")
+            return filtered
         else:
-            # Call parent's keyword filtering logic
+            # Strict keyword matching
             filtered = super()._filter_leads(leads)
             print(f"   🔍 Reddit: Keyword filter enabled - {len(filtered)}/{len(leads)} leads matched keywords")
             return filtered
+
+    def _is_potential_inquiry(self, lead: Lead) -> bool:
+        """
+        Quick check if post could be a service inquiry (soft filter).
+        Removes obvious non-inquiries without requiring keyword match.
+
+        Returns:
+            True if lead could be a service inquiry, False if obviously not
+        """
+        content_lower = lead.content.lower()
+        title_lower = (lead.title or "").lower()
+        full_text = f"{title_lower} {content_lower}"
+
+        # EXCLUDE: Obvious non-inquiries
+        exclude_patterns = [
+            # News/announcements
+            "just launched", "proud to announce", "we released",
+            "new feature", "check out our", "introducing",
+
+            # Self-promotion
+            "i built", "i made", "i created", "my startup",
+            "my company", "our product", "our platform",
+
+            # Link spam
+            "read more:", "full article:", "source:",
+
+            # Questions to community (not service requests)
+            "what do you think", "thoughts on", "anyone else",
+            "does anyone else", "is it just me",
+
+            # Educational/discussion
+            "eli5", "explain like", "can someone explain",
+            "what is", "what are", "how does"  # without business context
+        ]
+
+        # If contains exclude pattern, likely not inquiry
+        if any(pattern in full_text for pattern in exclude_patterns):
+            # EXCEPTION: If also has buying signal, keep it
+            buying_signals = [
+                "budget", "willing to pay", "looking for", "need help",
+                "hire", "hiring", "seeking", "recommend"
+            ]
+            if not any(signal in full_text for signal in buying_signals):
+                return False
+
+        # INCLUDE: Clear service inquiry signals
+        inquiry_signals = [
+            # Direct requests
+            "looking for", "need help", "need someone", "need a",
+            "anyone recommend", "recommendations for",
+
+            # Hiring
+            "[hiring]", "[for hire]", "[task]",
+            "hiring", "looking to hire",
+
+            # Budget/payment
+            "budget", "willing to pay", "can pay",
+
+            # Problem statements
+            "struggling with", "help with", "stuck on",
+
+            # Evaluation
+            "considering", "evaluating", "exploring options"
+        ]
+
+        # If has inquiry signal, definitely keep
+        if any(signal in full_text for signal in inquiry_signals):
+            return True
+
+        # Default: Keep borderline cases (let LLM decide)
+        # This soft filter only removes obvious non-inquiries
+        return len(lead.content.split()) >= 15  # At least 15 words (substantive post)
 
     def _get_time_filter_for_praw(self) -> str:
         """
@@ -282,9 +361,6 @@ class RedditScraper(BaseScraper):
             # Wrap PRAW call in thread executor for true async
             subreddit = await asyncio.to_thread(self.reddit.subreddit, subreddit_name)
 
-            # Get PRAW time filter
-            time_filter = self._get_time_filter_for_praw()
-
             # Calculate cutoff time for early stopping
             cutoff_time = datetime.now() - timedelta(days=self.days_filter) if self.days_filter > 0 else None
 
@@ -312,29 +388,27 @@ class RedditScraper(BaseScraper):
 
                 return posts
 
-            # Fetch posts with smart limits based on time filter
+            # OPTIMIZED: Single-feed strategy with smart limits (eliminates hot feed overlap)
             if self.days_filter <= 1:
-                # Last 24 hours: new posts are most relevant
-                new_posts = await asyncio.to_thread(lambda: fetch_with_cutoff(subreddit.new(limit=200), 80))
-                hot_posts = await asyncio.to_thread(lambda: fetch_with_cutoff(subreddit.hot(limit=100), 40))
-                top_posts = await asyncio.to_thread(lambda: list(subreddit.top(time_filter='day', limit=30)))
+                # Last 24 hours: Focus on NEW posts only
+                new_posts = await asyncio.to_thread(lambda: fetch_with_cutoff(subreddit.new(limit=100), 50))
+                hot_posts = []
+                top_posts = []
             elif self.days_filter <= 7:
-                # Last week: balanced approach
-                new_posts = await asyncio.to_thread(lambda: fetch_with_cutoff(subreddit.new(limit=150), 50))
-                hot_posts = await asyncio.to_thread(lambda: fetch_with_cutoff(subreddit.hot(limit=80), 30))
-                top_posts = await asyncio.to_thread(lambda: list(subreddit.top(time_filter='week', limit=50)))
+                # Last week: NEW + TOP (skip hot, it overlaps heavily)
+                new_posts = await asyncio.to_thread(lambda: fetch_with_cutoff(subreddit.new(limit=80), 40))
+                hot_posts = []
+                top_posts = await asyncio.to_thread(lambda: list(subreddit.top(time_filter='week', limit=20)))
             elif self.days_filter <= 30:
-                # Last month: focus on top posts
-                new_posts = await asyncio.to_thread(lambda: fetch_with_cutoff(subreddit.new(limit=100), 30))
-                hot_posts = await asyncio.to_thread(lambda: fetch_with_cutoff(subreddit.hot(limit=60), 20))
-                top_posts = await asyncio.to_thread(lambda: list(subreddit.top(time_filter='month', limit=60)))
+                # Last month: TOP posts only (most engagement)
+                new_posts = []
+                hot_posts = []
+                top_posts = await asyncio.to_thread(lambda: list(subreddit.top(time_filter='month', limit=50)))
             else:
-                # Longer periods or no filter: standard approach
-                new_posts = await asyncio.to_thread(lambda: list(subreddit.new(limit=50)))
-                hot_posts = await asyncio.to_thread(lambda: list(subreddit.hot(limit=50)))
-                top_week = await asyncio.to_thread(lambda: list(subreddit.top(time_filter='week', limit=30)))
-                top_month = await asyncio.to_thread(lambda: list(subreddit.top(time_filter=time_filter, limit=40)))
-                top_posts = top_week + top_month
+                # Longer periods: Balanced approach
+                new_posts = await asyncio.to_thread(lambda: fetch_with_cutoff(subreddit.new(limit=30), 20))
+                hot_posts = []
+                top_posts = await asyncio.to_thread(lambda: list(subreddit.top(time_filter='month', limit=30)))
 
             # Combine and deduplicate (all posts already filtered by date)
             all_posts = {post.id: post for post in hot_posts + new_posts + top_posts}.values()
@@ -364,35 +438,44 @@ class RedditScraper(BaseScraper):
                         traceback.print_exc()
                     continue
 
-                # Dynamic comment depth based on engagement
-                # High-engagement posts (score ≥50) get more comments checked
-                comment_limit = 50 if submission.score >= 50 else 20
+                # OPTIMIZED: Minimal comment processing (posts > comments for service requests)
+                # Only process comments on high-engagement posts in help-seeking subreddits
+                HELP_SEEKING_SUBREDDITS = ['forhire', 'slavelabour', 'Jobs4Bitcoins', 'hire']
+                is_help_subreddit = subreddit_name.lower() in HELP_SEEKING_SUBREDDITS
+
+                if is_help_subreddit and submission.score >= 20:
+                    comment_limit = 10  # Only top 10 comments (reduced from 20-50)
+                elif submission.score >= 100:
+                    comment_limit = 5   # Only top 5 for viral posts
+                else:
+                    comment_limit = 0   # Skip comments entirely (focus on posts)
 
                 # DEBUG: Uncomment for comment fetching info
                 # print(f"   DEBUG: Fetching {comment_limit} comments from post {submission.id}")
 
-                # Check comments
-                try:
-                    # FIX (ISSUE #3): No additional rate limiting - PRAW handles this internally
-                    # Wrap blocking PRAW operations in thread executor
-                    await asyncio.to_thread(submission.comments.replace_more, limit=0)
-                    all_comments = await asyncio.to_thread(submission.comments.list)
+                # Check comments (skip if comment_limit is 0)
+                if comment_limit > 0:
+                    try:
+                        # FIX (ISSUE #3): No additional rate limiting - PRAW handles this internally
+                        # Wrap blocking PRAW operations in thread executor
+                        await asyncio.to_thread(submission.comments.replace_more, limit=0)
+                        all_comments = await asyncio.to_thread(submission.comments.list)
 
-                    for comment in all_comments[:comment_limit]:
-                        if isinstance(comment, Comment):
-                            comment_lead = self._create_lead_from_comment(
-                                comment,
-                                submission,
-                                subreddit_name
-                            )
-                            if comment_lead:
-                                leads.append(comment_lead)
-                except Exception as e:
-                    # IMPROVED (ISSUE #4): Specific error for comment fetching
-                    print(f"⚠️ Reddit: Error fetching comments for post {submission.id}: {e}")
-                    if settings.debug_mode:
-                        traceback.print_exc()
-                    continue
+                        for comment in all_comments[:comment_limit]:
+                            if isinstance(comment, Comment):
+                                comment_lead = self._create_lead_from_comment(
+                                    comment,
+                                    submission,
+                                    subreddit_name
+                                )
+                                if comment_lead:
+                                    leads.append(comment_lead)
+                    except Exception as e:
+                        # IMPROVED (ISSUE #4): Specific error for comment fetching
+                        print(f"⚠️ Reddit: Error fetching comments for post {submission.id}: {e}")
+                        if settings.debug_mode:
+                            traceback.print_exc()
+                        continue
 
         except Exception as e:
             # IMPROVED (ISSUE #4): Distinguish subreddit access errors
