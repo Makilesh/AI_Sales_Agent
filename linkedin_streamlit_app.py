@@ -60,21 +60,77 @@ st.markdown("""
 def login_to_linkedin(driver, username, password):
     """Login to LinkedIn using username and password."""
     try:
+        st.info("Navigating to LinkedIn login page...")
         driver.get("https://www.linkedin.com/login")
-        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "username")))
+        time.sleep(3)
+        
+        st.info("Finding login fields...")
+        WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.ID, "username")))
+        
         username_field = driver.find_element(By.ID, "username")
         password_field = driver.find_element(By.ID, "password")
+        
+        st.info("Entering credentials...")
+        username_field.clear()
+        time.sleep(0.5)
         username_field.send_keys(username)
+        time.sleep(1)
+        
+        password_field.clear()
+        time.sleep(0.5)
         password_field.send_keys(password)
+        time.sleep(1)
+        
+        st.info("Submitting login form...")
         password_field.send_keys(Keys.RETURN)
-        WebDriverWait(driver, 10).until(EC.url_contains("feed"))
-
-        if "checkpoint" in driver.current_url:
-            st.error("Manual verification required. Please complete the verification in the browser.")
-            st.stop()
-        return True
+        
+        # Wait longer for page to load
+        time.sleep(5)
+        
+        # Check current URL
+        current_url = driver.current_url
+        st.info(f"Current URL after login: {current_url}")
+        
+        # Check for various post-login scenarios
+        if "checkpoint" in current_url or "challenge" in current_url:
+            st.error("❌ LinkedIn requires verification. This account may need to verify login from a browser first.")
+            st.error("Please login manually in a browser, complete any verification, then try again.")
+            return False
+        
+        if "login" in current_url and "feed" not in current_url:
+            st.error("❌ Login failed. Possible reasons:")
+            st.error("- Incorrect credentials")
+            st.error("- Account locked or suspended")
+            st.error("- LinkedIn detected automation")
+            return False
+        
+        # Try to wait for feed page
+        try:
+            WebDriverWait(driver, 15).until(
+                lambda d: "feed" in d.current_url or "mynetwork" in d.current_url or "linkedin.com/in/" in d.current_url
+            )
+            st.success("✅ Successfully logged in!")
+            return True
+        except TimeoutException:
+            st.warning(f"⚠️ Login may have succeeded but couldn't confirm. Current URL: {current_url}")
+            # Try to continue anyway
+            if "linkedin.com" in current_url and "login" not in current_url:
+                return True
+            return False
+            
+    except TimeoutException as e:
+        st.error(f"❌ Timeout during login: Page elements took too long to load")
+        st.error(f"Details: {str(e)}")
+        return False
+    except NoSuchElementException as e:
+        st.error(f"❌ Could not find login elements on page")
+        st.error(f"Details: {str(e)}")
+        return False
     except Exception as e:
-        st.error(f"Login failed: {e}")
+        st.error(f"❌ Login failed with error: {str(e)}")
+        st.error(f"Error type: {type(e).__name__}")
+        import traceback
+        st.error(f"Traceback: {traceback.format_exc()}")
         return False
 
 
@@ -269,45 +325,148 @@ def filter_duplicate_posts(posts):
 def main():
     """Main Streamlit application."""
     st.header("LinkedIn Lead Scraper")
+    
+    # Initialize session state
+    if 'driver' not in st.session_state:
+        st.session_state.driver = None
+    if 'login_pending' not in st.session_state:
+        st.session_state.login_pending = False
+    if 'scraping_started' not in st.session_state:
+        st.session_state.scraping_started = False
 
     # Sidebar for inputs
     with st.sidebar:
         st.text("")
         st.text("")
-        linkedin_username = st.text_input("LinkedIn Username", value="fatbatman85@gmail.com")
-        linkedin_password = st.text_input("LinkedIn Password", type="password", value="makilesh")
+        
+        # Login method selection
+        manual_login = st.checkbox("🔐 Manual Login (Recommended)", value=True, 
+                                   help="Opens browser for you to login manually, avoiding verification issues")
+        
+        if not manual_login:
+            linkedin_username = st.text_input("LinkedIn Username", value="fatbatman85@gmail.com")
+            linkedin_password = st.text_input("LinkedIn Password", type="password", value="makilesh")
+        else:
+            st.info("ℹ️ Browser will open. Login manually, then click 'Continue Scraping'")
+            linkedin_username = ""
+            linkedin_password = ""
+            
         keywords = st.text_input("Keywords (comma-separated)", value="RWA, tokenization, blockchain")
         max_scroll_attempts = st.number_input("Max Scroll Attempts", min_value=1, value=5)
-        start_scraping = st.button("Start Scraping", use_container_width=True)
+        
+        if not st.session_state.login_pending:
+            start_scraping = st.button("Start Scraping", use_container_width=True)
+        else:
+            start_scraping = False
 
-    # Main content area
-    if start_scraping:
-        if not linkedin_username or not linkedin_password:
-            st.error("Please provide LinkedIn username and password")
-            st.stop()
-            
+    # Initialize or retrieve driver
+    if start_scraping and st.session_state.driver is None:
         if not keywords:
             st.error("Please provide at least one keyword")
             st.stop()
+            
+        if not manual_login and (not linkedin_username or not linkedin_password):
+            st.error("Please provide LinkedIn username and password")
+            st.stop()
 
         chrome_options = Options()
-        chrome_options.add_argument("--headless")
+        # Run in visible mode for debugging - comment this out to run headless
+        # chrome_options.add_argument("--headless")  # Disabled for debugging
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+        chrome_options.add_argument("--disable-infobars")
+        chrome_options.add_argument("--start-maximized")
+        chrome_options.add_argument("--disable-extensions")
+        chrome_options.add_argument("--disable-gpu")
+        chrome_options.add_argument("--disable-notifications")
+        
+        # Add a realistic user agent
+        chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+        
+        # Anti-detection options
         chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
         chrome_options.add_experimental_option('useAutomationExtension', False)
+        chrome_options.add_experimental_option("prefs", {
+            "profile.default_content_setting_values.notifications": 2,
+            "credentials_enable_service": False,
+            "profile.password_manager_enabled": False
+        })
         
         service = Service(ChromeDriverManager().install())
         driver = webdriver.Chrome(service=service, options=chrome_options)
         
+        # Execute anti-detection scripts
+        driver.execute_cdp_cmd('Network.setUserAgentOverride', {
+            "userAgent": 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        })
+        driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+        
+        st.info("✅ Chrome browser initialized")
+        
+        # Store driver in session state
+        st.session_state.driver = driver
+        st.session_state.keywords = keywords
+        st.session_state.max_scroll_attempts = max_scroll_attempts
+        st.session_state.manual_login = manual_login
+        st.session_state.linkedin_username = linkedin_username if not manual_login else ""
+        st.session_state.linkedin_password = linkedin_password if not manual_login else ""
+        
+        # Open login page for manual login
+        if manual_login:
+            st.info("🌐 Opening LinkedIn for manual login...")
+            driver.get("https://www.linkedin.com/login")
+            time.sleep(2)
+            st.session_state.login_pending = True
+            st.rerun()
+    
+    # Handle manual login flow
+    if st.session_state.login_pending and st.session_state.driver is not None:
+        driver = st.session_state.driver
+        
+        st.warning("⏸️ **Please login manually in the browser window**")
+        st.markdown("### Steps:")
+        st.markdown("1. ✅ Complete the login in the Chrome window")
+        st.markdown("2. ✅ Complete any verification if requested")  
+        st.markdown("3. ✅ Wait until you see your LinkedIn feed")
+        st.markdown("4. ✅ Click the 'Continue Scraping' button below")
+        
+        # Wait for user confirmation
+        continue_scraping = st.button("✅ Continue Scraping (I've logged in)", use_container_width=True, type="primary", key="continue_btn")
+        
+        if not continue_scraping:
+            st.info("⏳ Waiting for you to login and click 'Continue Scraping'...")
+            st.stop()
+        
+        # Verify login was successful
+        current_url = driver.current_url
+        st.info(f"Current URL: {current_url}")
+        
+        if "login" in current_url:
+            st.error("❌ You don't appear to be logged in yet. Please complete the login and try again.")
+            st.stop()
+        
+        st.success("✅ Login confirmed! Starting scraping...")
+        st.session_state.login_pending = False
+        st.session_state.scraping_started = True
+        st.rerun()
+    
+    # Handle scraping
+    if st.session_state.scraping_started and st.session_state.driver is not None:
+        driver = st.session_state.driver
+        keywords = st.session_state.keywords
+        max_scroll_attempts = st.session_state.max_scroll_attempts
+        manual_login = st.session_state.manual_login
+        
         all_posts = []
 
         try:
-            with st.spinner("Logging in to LinkedIn..."):
-                if not login_to_linkedin(driver, linkedin_username, linkedin_password):
-                    st.stop()
-            st.success("Successfully logged in to LinkedIn")
+            # For automatic login (not manual)
+            if not manual_login:
+                with st.spinner("Logging in to LinkedIn..."):
+                    if not login_to_linkedin(driver, st.session_state.linkedin_username, st.session_state.linkedin_password):
+                        st.stop()
+                st.success("Successfully logged in to LinkedIn")
 
             keyword_list = [k.strip() for k in keywords.split(',')]
 
@@ -391,11 +550,19 @@ def main():
             import traceback
             st.error(traceback.format_exc())
         finally:
+            # Clean up driver and reset state
             try:
-                driver.quit()
+                if st.session_state.driver:
+                    st.session_state.driver.quit()
             except:
                 pass
+            st.session_state.driver = None
+            st.session_state.login_pending = False
+            st.session_state.scraping_started = False
             gc.collect()
+            
+            st.success("✅ Scraping completed! Browser closed.")
+            st.info("Click 'Start Scraping' to run again.")
 
 
 if __name__ == "__main__":
