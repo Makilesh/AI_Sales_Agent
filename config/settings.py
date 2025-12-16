@@ -48,6 +48,61 @@ class RedditConfig:
         "SecurityTokens",  # Security token offerings
         "assetmanagement",  # Asset management (tokenization candidates)
     ])
+    
+    # Service-specific subreddit mappings
+    SERVICE_SUBREDDITS: dict[str, list[str]] = field(default_factory=lambda: {
+        "rwa": [
+            # Business/entrepreneur subreddits (people seeking solutions)
+            "entrepreneur", "startups", "smallbusiness", "SaaS",
+            # Real estate focused (high RWA relevance)
+            "realestateinvesting", "RealEstate", "CommercialRealEstate", 
+            "RealEstateInvestments", "investing",
+            # Tokenization specific
+            "tokenization", "SecurityTokens", "assetmanagement",
+            # DeFi/Web3 (for RWA tokenization projects)
+            "defi", "web3",
+        ],
+        "crypto": [
+            # Business seeking crypto solutions
+            "entrepreneur", "startups", "smallbusiness",
+            # Crypto/Web3 focused
+            "cryptocurrency", "CryptoTechnology", "web3", "defi",
+            "ethdev", "solidity", "cryptodevs",
+            # Crypto jobs/gigs
+            "Jobs4Bitcoins",
+        ],
+        "ai": [
+            # Business seeking AI solutions
+            "entrepreneur", "startups", "smallbusiness", "SaaS",
+            # AI/ML focused
+            "learnmachinelearning",
+        ],
+        "blockchain": [
+            # Business seeking blockchain solutions
+            "entrepreneur", "startups", "smallbusiness",
+            # Blockchain focused
+            "cryptocurrency", "CryptoTechnology", "web3", "defi",
+            "ethdev", "solidity", "cryptodevs",
+        ],
+        "web3": [
+            # Business seeking Web3 solutions
+            "entrepreneur", "startups", "smallbusiness", "SaaS",
+            # Web3 focused
+            "web3", "cryptocurrency", "defi", "ethdev",
+        ],
+        "defi": [
+            # Business seeking DeFi solutions
+            "entrepreneur", "startups", "smallbusiness",
+            # DeFi focused
+            "defi", "cryptocurrency", "CryptoTechnology", "web3",
+        ],
+        "smart_contracts": [
+            # Business seeking smart contract solutions
+            "entrepreneur", "startups", "smallbusiness",
+            # Smart contract focused
+            "ethdev", "solidity", "web3", "cryptocurrency",
+        ],
+    })
 
 
 @dataclass

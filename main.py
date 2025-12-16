@@ -417,6 +417,13 @@ def main():
             print(f"🎯 Using '{args.service}' keyword preset ({len(preset_keywords)} keywords)")
         else:
             print(f"⚠️  Service preset '{args.service}' not found, using default keywords")
+        
+        # 🔍 NEW: Filter subreddits based on service type
+        service_subreddits = settings.reddit.SERVICE_SUBREDDITS.get(args.service, [])
+        if service_subreddits and 'reddit' in args.sources:
+            original_count = len(settings.reddit.subreddits)
+            settings.reddit.subreddits = service_subreddits
+            print(f"📊 Filtered subreddits: {len(service_subreddits)} relevant to {args.service.upper()} (was {original_count})")
     
     # Apply global limit if specified
     if args.max_total_leads:
