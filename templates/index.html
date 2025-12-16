@@ -510,6 +510,14 @@
                                 <input type="checkbox" id="linkedin_apify" name="sources" value="linkedin_apify">
                                 <label for="linkedin_apify" style="margin: 0;">LinkedIn Apify (Recommended)</label>
                             </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="linkedin_pw" name="sources" value="linkedin_pw">
+                                <label for="linkedin_pw" style="margin: 0;">LinkedIn Playwright</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="linkedin_sl" name="sources" value="linkedin_sl">
+                                <label for="linkedin_sl" style="margin: 0;">LinkedIn Selenium</label>
+                            </div>
                         </div>
                     </div>
 
@@ -652,6 +660,8 @@
                 document.getElementById('slack').closest('.checkbox-item').classList.toggle('disabled', !config.sources.slack);
                 document.getElementById('linkedin_public').closest('.checkbox-item').classList.toggle('disabled', !config.sources.linkedin_public);
                 document.getElementById('linkedin_apify').closest('.checkbox-item').classList.toggle('disabled', !config.sources.linkedin_apify);
+                document.getElementById('linkedin_pw').closest('.checkbox-item').classList.toggle('disabled', !config.sources.linkedin_pw);
+                document.getElementById('linkedin_sl').closest('.checkbox-item').classList.toggle('disabled', !config.sources.linkedin_sl);
 
                 // Disable checkboxes for unavailable sources
                 document.getElementById('reddit').disabled = !config.sources.reddit;

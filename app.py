@@ -16,6 +16,8 @@ from scrapers.discord_scraper import DiscordScraper
 from scrapers.slack_scraper import SlackScraper
 from scrapers.linkedin_public_scraper import LinkedInPublicScraper
 from scrapers.linkedin_apify_scraper import LinkedInApifyScraper
+from scrapers.linkedin_pw_scraper import LinkedInPlaywrightScraper
+from scrapers.linkedin_sl_scraper import LinkedInSeleniumScraper
 from storage.json_handler import append_leads
 from storage.excel_handler import export_to_excel
 from utils.llm_handler import qualify_leads_concurrent
@@ -119,6 +121,30 @@ async def run_scraper(source: str, keywords: list[str]) -> list[Lead]:
                 return await asyncio.wait_for(scraper.scrape_with_rate_limit(), timeout=300)
             return []
         
+        elif source == 'linkedin_pw':
+            if not settings.linkedin_apify.linkedin_cookie:
+                print(f"⚠️ LinkedIn cookie not configured")
+                return []
+            scraper = LinkedInPlaywrightScraper(
+                linkedin_cookie=settings.linkedin_apify.linkedin_cookie,
+                keywords=keywords,
+                rate_limit=10,
+                headless=True
+            )
+            return await asyncio.wait_for(scraper.scrape_with_rate_limit(), timeout=300)
+        
+        elif source == 'linkedin_sl':
+            if not settings.linkedin_apify.linkedin_cookie:
+                print(f"⚠️ LinkedIn cookie not configured")
+                return []
+            scraper = LinkedInSeleniumScraper(
+                linkedin_cookie=settings.linkedin_apify.linkedin_cookie,
+                keywords=keywords,
+                rate_limit=10,
+                headless=True
+            )
+            return await asyncio.wait_for(scraper.scrape_with_rate_limit(), timeout=300)
+        
     except asyncio.TimeoutError:
         print(f"⏱️ {source}: Scraping timeout (5 minutes)")
         return []
@@ -142,7 +168,9 @@ def get_config():
             'discord': bool(settings.discord.bot_token),
             'slack': bool(settings.slack.bot_token),
             'linkedin_public': settings.linkedin_public.enabled,
-            'linkedin_apify': settings.linkedin_apify.enabled
+            'linkedin_apify': settings.linkedin_apify.enabled,
+            'linkedin_pw': bool(settings.linkedin_apify.linkedin_cookie),
+            'linkedin_sl': bool(settings.linkedin_apify.linkedin_cookie)
         },
         'llm': {
             'openai_configured': bool(settings.openai_api_key),
