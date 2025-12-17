@@ -106,19 +106,40 @@ class LLMLeadQualifier:
 - Fractional ownership solutions
 - Regulatory-compliant tokenization
 
-**STRICT RWA CRITERIA - MUST have ALL:**
-1. Someone has a PHYSICAL/FINANCIAL ASSET (property, art, commodity, securities)
-2. They want to TOKENIZE it or BUILD a tokenization platform
-3. Clear buyer intent ("I want to", "need help", "how to")
+**RWA QUALIFICATION - ACCEPT if ANY of these patterns:**
+
+1. **EXPLICIT TOKENIZATION INTENT** (confidence: 0.8-1.0)
+   - Direct mention: "tokenize", "tokenization", "tokenizing"
+   - Asset + action: "tokenize my property", "fractionalize our real estate"
+   - Platform seeking: "tokenization platform", "STO platform"
+
+2. **IMPLICIT TOKENIZATION INTENT** (confidence: 0.6-0.8)
+   - Fractional ownership + real assets (property, art, securities)
+   - "Digital securities" + real assets
+   - "Blockchain for real estate" + investment/fractionalization context
+   - "Asset-backed tokens" or "security tokens"
+   - Mentions STO, Reg D, 506c offerings (regulatory terms)
+
+3. **EXPLORATORY/RESEARCH** (confidence: 0.5-0.7)
+   - "Exploring/considering/researching" + tokenization/fractional ownership
+   - Questions about tokenization: "how to tokenize", "best way to tokenize"
+   - Asset owner researching solutions: "options for fractionalizing my property"
 
 **AUTOMATIC REJECT:**
-- AI/ML projects (not RWA)
-- Blockchain dev jobs (not asset tokenization)
-- Crypto payments/wallets (not asset tokenization)
-- Smart contracts UNLESS for asset tokenization
-- DeFi/Web3 UNLESS for RWA
-- [Hiring] or [For Hire] posts"""
-            rejection_rule = "\n**MANDATORY: If not about ASSET TOKENIZATION, set is_qualified=false with reason='Not RWA - [topic]' and service_match=[]"
+- AI/ML projects (no asset tokenization)
+- Pure blockchain dev (no specific assets)
+- Crypto payments/wallets (no real world assets)
+- General smart contracts (not tokenization-focused)
+- DeFi protocols (unless explicitly for RWA/asset tokenization)
+- Job postings: [Hiring] employee positions
+- Service providers: [For Hire] developers offering services
+- News/discussion: "What do you think about tokenization?"
+
+**EDGE CASES - USE CONTEXT:**
+- "Hiring tokenization consultant" → ACCEPT (seeking vendor, not employee)
+- "Blockchain solution for real estate fund" → ACCEPT if mentions fractionalization/investment
+- "Digital platform for property investment" → ACCEPT if implies fractional ownership"""
+            rejection_rule = "\n**MANDATORY: If not about ASSET TOKENIZATION (explicit OR implicit), set is_qualified=false with reason='Not RWA - [topic]' and service_match=[]"
         else:
             service_context = "**Services:** RWA Tokenization, Crypto/Web3, Blockchain, AI/ML"
             rejection_rule = ""
@@ -244,15 +265,28 @@ JSON: {{"is_qualified": true/false, "confidence_score": 0.0-1.0, "reason": "[ACC
         if spam_count >= 2:
             return False, "spam/self-promotion (2+ indicators)"
 
-        # BLOCK 2: Job postings (company hiring, not seeking service)
-        # Single strong indicator is enough
+        # BLOCK 2: Job postings (company hiring employees, NOT consultants/vendors)
+        # Exception: Allow if seeking consultant/vendor/agency
         hiring_indicators = [
             "[hiring]", "we are hiring", "we're hiring", "apply now",
             "submit your resume", "send cv to", "years experience required",
             "remote work in the ai", "earn $", "weekly ai projects"
         ]
+        
         if any(indicator in full_text for indicator in hiring_indicators):
-            return False, "job posting (company hiring)"
+            # EXCEPTION: Check if hiring consultant/vendor (legitimate service request)
+            consultant_indicators = [
+                "hiring consultant", "hiring agency", "hiring vendor",
+                "hiring freelancer", "hiring contractor", "seeking consultant",
+                "looking for consultant", "need consultant", "consultant needed",
+                "agency needed", "vendor needed", "freelancer needed"
+            ]
+            
+            # If hiring consultant/vendor, allow through (not employee hiring)
+            if any(consultant in full_text for consultant in consultant_indicators):
+                pass  # Allow - this is a service request
+            else:
+                return False, "job posting (company hiring employees)"
         
         # BLOCK 3: Service providers offering services (not seeking)
         # These are freelancers/agencies promoting themselves
