@@ -6,16 +6,19 @@ AI-powered lead scraper that collects and qualifies leads from Reddit, Discord, 
 
 ## Features
 
+✅ **Web Interface**: Flask app with real-time job tracking and batch operations  
 ✅ **Multi-Source Scraping**: Reddit, Discord, Slack, LinkedIn (public & Apify)  
+✅ **🎯 RWA Lead Optimization**: 3-stage filtering optimized for Real World Asset tokenization leads  
 ✅ **Smart Pre-Validation**: 94.6% cost savings - filters spam before LLM calls  
 ✅ **Dual LLM System**: OpenAI GPT-4-turbo (primary) + Gemini 2.5 Flash (fallback)  
 ✅ **Bulletproof Reliability**: Automatic Gemini fallback when OpenAI quota exceeded  
-✅ **Advanced Filtering**: 3-stage pre-validation (spam, help phrases, implicit signals)  
+✅ **Advanced Filtering**: Soft filter with RWA bypass, pre-filter, and LLM validation  
 ✅ **🎯 Competitor Frustration Detection**: Automatically finds leads dissatisfied with your direct competitors  
+✅ **Service-Based Subreddit Filtering**: Targets 14 RWA-specific subreddits vs 28 generic  
 ✅ **Rate Limiting**: Respects platform limits (60/min Reddit, 50/sec Discord, 1/sec Slack)  
-✅ **Lead Qualification**: AI-powered detection of genuine service inquiries  
+✅ **Lead Qualification**: AI-powered detection with 3-tier confidence scoring  
 ✅ **Auto-Deduplication**: By URL with intelligent merging  
-✅ **Excel Export**: Qualified leads with confidence scores  
+✅ **Excel Export**: Qualified leads with confidence scores + all leads export  
 ✅ **CLI Interface**: Flexible source and service selection  
 
 ## Requirements
@@ -26,6 +29,8 @@ AI-powered lead scraper that collects and qualifies leads from Reddit, Discord, 
 - Gemini API key (fallback LLM - optional but recommended)
 
 ## Quick Start
+
+### Option 1: Web Interface (Recommended)
 
 ```bash
 # 1. Create virtual environment
@@ -41,7 +46,17 @@ copy .env.example .env  # Windows
 # cp .env.example .env  # Linux/Mac
 # Edit .env with your API keys
 
-# 4. Run scraper with qualification
+# 4. Start Flask web app
+python app.py
+
+# 5. Open browser
+# Navigate to http://localhost:5000
+```
+
+### Option 2: Command Line
+
+```bash
+# Run scraper with qualification
 python main.py --sources reddit --service rwa --qualify --max-total-leads 500
 ```
 
@@ -141,6 +156,41 @@ optional arguments:
 | `--no-filter` | Flag | Disable pre-qualification filtering (scrape everything) | False (filtering enabled) |
 | `--qualify` | Flag | Auto-run LLM qualification without prompting | False (will prompt if OpenAI key exists) |
 | `--filter-service` | Choice | LLM will ONLY qualify leads asking for this specific service | None (all services) |
+
+## Reddit RWA Lead Optimization
+
+The Reddit scraper is optimized for **Real World Asset (RWA) tokenization leads** with:
+
+### 3-Stage Filtering Pipeline
+
+1. **Soft Filter** (reddit_scraper.py)
+   - RWA bypass logic: Catches exploratory language like "exploring tokenization", "need tokenization consultant"
+   - Blocks service providers: `[For Hire]`, "I offer", "my services"
+   - 15+ RWA-specific patterns for high recall
+
+2. **Pre-Filter** (llm_handler.py)
+   - Blocks spam and employee hiring
+   - Allows consultant/vendor hiring (B2B opportunities)
+   - Runs before LLM to save costs
+
+3. **LLM Validation** (llm_handler.py)
+   - Service-specific validation
+   - 3-tier confidence scoring (explicit/implicit/exploratory)
+   - Post-LLM validation to catch false positives
+
+### Service-Based Subreddit Filtering
+
+- **RWA service**: 14 targeted subreddits (entrepreneur, realestateinvesting, tokenization, etc.)
+- **Crypto service**: 11 subreddits
+- **Default**: All 28 subreddits
+
+### 56 RWA Keywords
+
+Expanded keyword set covering:
+- Explicit ownership terms ("tokenize my property", "fractional ownership")
+- Exploratory phrases ("exploring tokenization", "considering tokenization")
+- Consultant/vendor hiring ("tokenization consultant", "need tokenization platform")
+- Natural variations ("digitize assets", "fractionalize real estate")
 
 ## Usage Examples
 
