@@ -115,6 +115,16 @@ class RedditScraper(BaseScraper):
         ]
         if any(pattern in full_text for pattern in exclude_patterns):
             return False  # No exceptions - hard block
+        
+        # BLOCK 2: Service providers (offering services, not seeking)
+        # Block BEFORE inquiry check to prevent false positives
+        offering_patterns = [
+            "[for hire]", "i offer", "my services include",
+            "i can help with", "i specialize in", "my expertise",
+            "portfolio:", "available for hire", "freelancer available"
+        ]
+        if any(pattern in full_text for pattern in offering_patterns):
+            return False  # Service provider - hard block
 
         # PRIORITY 1: RWA-specific bypass (catches exploratory language)
         # These indicate RWA intent even without explicit inquiry signals
