@@ -96,11 +96,11 @@ class RedditScraper(BaseScraper):
 
     def _is_potential_inquiry(self, lead: Lead) -> bool:
         """
-        OPTIMIZED: Stricter soft filter - requires explicit inquiry signals.
-        Removes obvious non-inquiries and borderline cases.
+        OPTIMIZED: Soft filter with RWA-specific bypass logic.
+        Removes spam/promotion while catching RWA exploratory language.
 
         Returns:
-            True if lead has explicit service inquiry signals, False otherwise
+            True if lead has inquiry signals OR strong RWA intent, False otherwise
         """
         content_lower = lead.content.lower()
         title_lower = (lead.title or "").lower()
@@ -116,17 +116,41 @@ class RedditScraper(BaseScraper):
         if any(pattern in full_text for pattern in exclude_patterns):
             return False  # No exceptions - hard block
 
-        # REQUIRE: Must have explicit inquiry signal (stricter than before)
+        # PRIORITY 1: RWA-specific bypass (catches exploratory language)
+        # These indicate RWA intent even without explicit inquiry signals
+        rwa_intent_patterns = [
+            # Explicit RWA actions with possessive (strong intent)
+            "tokenize my", "tokenize our", "fractionalize my", "fractionalize our",
+            # Exploratory RWA language (researching solutions)
+            "exploring tokenization", "considering tokenization", "researching tokenization",
+            "exploring fractional", "considering fractional", "researching fractional",
+            # Need-based RWA (implicit inquiry)
+            "need tokenization", "need to tokenize", "want to tokenize",
+            "need fractional", "need asset tokenization",
+            # Platform/service seeking (RWA-specific)
+            "tokenization platform", "tokenization service", "tokenization consultant",
+            "sto platform", "sto service", "security token offering",
+            # Real estate + tokenization combo
+            "real estate token", "property token", "tokenized real estate",
+            "tokenize property", "tokenize real estate"
+        ]
+        
+        if any(pattern in full_text for pattern in rwa_intent_patterns):
+            return True  # RWA intent detected - bypass general inquiry check
+
+        # PRIORITY 2: General inquiry signals (existing logic)
         inquiry_signals = [
             "looking for", "need help", "need someone", "need a",
             "anyone recommend", "recommendations for",
             "[hiring]", "[for hire]", "[task]", "hiring",
             "budget", "willing to pay", "can pay",
             "struggling with", "help with", "stuck on",
-            "seeking", "best tool", "best platform", "best service"
+            "seeking", "best tool", "best platform", "best service",
+            # Added exploratory signals for all services
+            "exploring options", "considering options", "researching solutions",
+            "evaluating platforms", "comparing services"
         ]
 
-        # CHANGED: No lenient fallback - must have explicit signal
         return any(signal in full_text for signal in inquiry_signals)
 
     def _get_time_filter_for_praw(self) -> str:
