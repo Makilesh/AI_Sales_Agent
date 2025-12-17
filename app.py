@@ -207,6 +207,7 @@ def start_scrape():
     max_leads = data.get('max_leads', 200)
     qualify = data.get('qualify', False)
     filter_service = data.get('filter_service', None)
+    min_confidence = data.get('min_confidence', 0.65)  # Minimum confidence score
     days_filter = data.get('days_filter', 30)  # Date filter for LinkedIn
     
     if not sources:
@@ -231,6 +232,7 @@ def start_scrape():
         'max_leads': max_leads,
         'qualify': qualify,
         'filter_service': filter_service,
+        'min_confidence': min_confidence,
         'service_preset': service_preset,  # Track which preset was used
         'days_filter': days_filter,
         'started_at': datetime.now().isoformat(),
@@ -240,7 +242,7 @@ def start_scrape():
     }
     
     # Run scraping in background
-    run_async_in_thread(run_scraping_job(job_id, sources, keywords, max_leads, qualify, filter_service, days_filter, service_preset))
+    run_async_in_thread(run_scraping_job(job_id, sources, keywords, max_leads, qualify, filter_service, min_confidence, days_filter, service_preset))
     
     return jsonify({
         'job_id': job_id,
@@ -249,11 +251,12 @@ def start_scrape():
     })
 
 
-async def run_scraping_job(job_id: str, sources: list, keywords: list, max_leads: int, qualify: bool, filter_service: str, days_filter: int = 30, service_preset: str = None):
+async def run_scraping_job(job_id: str, sources: list, keywords: list, max_leads: int, qualify: bool, filter_service: str, min_confidence: float = 0.65, days_filter: int = 30, service_preset: str = None):
     """Run scraping job in background."""
     try:
-        # Update max leads and days filter (universal for all sources)
+        # Update max leads, min confidence, and days filter (universal for all sources)
         settings.scraping.max_total_leads = max_leads
+        settings.min_confidence_score = min_confidence  # Set confidence threshold
         settings.scraping.days_filter = days_filter  # Universal days filter
         settings.linkedin_apify.days_filter = days_filter  # LinkedIn-specific (kept for backward compat)
         
@@ -296,10 +299,10 @@ async def run_scraping_job(job_id: str, sources: list, keywords: list, max_leads
             for lead, qual in zip(all_leads, qualifications):
                 lead.qualification_result = qual
             
-            # Filter qualified
+            # Filter qualified leads by confidence threshold
             qualified_leads = [
                 lead for lead, qual in zip(all_leads, qualifications)
-                if qual.get('is_qualified', False)
+                if qual.get('is_qualified', False) and qual.get('confidence_score', 0) >= min_confidence
             ]
             
             scraping_jobs[job_id]['qualified_count'] = len(qualified_leads)

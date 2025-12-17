@@ -603,7 +603,7 @@
                     </div>
 
                     <!-- Service Filter -->
-                    <div class="form-group" id="filterServiceGroup" style="display: none;">
+                    <div class="form-group" id="filterServiceGroup" style="display: block;">
                         <label for="filterService">🎯 Filter Specific Service</label>
                         <select id="filterService" name="filter_service">
                             <option value="">All Services</option>
@@ -613,6 +613,13 @@
                             <option value="Blockchain">Blockchain Only</option>
                             <option value="Web3">Web3 Only</option>
                         </select>
+                    </div>
+
+                    <!-- Minimum Confidence -->
+                    <div class="form-group" id="minConfidenceGroup" style="display: block;">
+                        <label for="minConfidence">🎯 Minimum Confidence Score</label>
+                        <input type="number" id="minConfidence" name="min_confidence" value="0.65" min="0.5" max="1.0" step="0.05">
+                        <div class="help-text">Only qualify leads with confidence ≥ this score (0.5 - 1.0)</div>
                     </div>
 
                     <!-- Submit Button -->
@@ -787,9 +794,10 @@
             `;
         }
 
-        // Show/hide service filter based on qualification checkbox
+        // Show/hide service filter and min confidence based on qualification checkbox
         document.getElementById('qualify').addEventListener('change', function() {
             document.getElementById('filterServiceGroup').style.display = this.checked ? 'block' : 'none';
+            document.getElementById('minConfidenceGroup').style.display = this.checked ? 'block' : 'none';
         });
 
         // Show/hide custom days input
@@ -825,6 +833,7 @@
             const maxLeads = parseInt(document.getElementById('maxLeads').value);
             const qualify = document.getElementById('qualify').checked;
             const filterService = document.getElementById('filterService').value;
+            const minConfidence = parseFloat(document.getElementById('minConfidence').value) || 0.65;
             
             // Handle days filter (custom or preset)
             let daysFilter;
@@ -843,7 +852,8 @@
                 max_leads: maxLeads,
                 days_filter: daysFilter,
                 qualify,
-                filter_service: filterService || null
+                filter_service: filterService || null,
+                min_confidence: minConfidence
             };
 
             try {
