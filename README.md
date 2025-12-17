@@ -132,7 +132,11 @@ optional arguments:
                         Universal: rwa, crypto, ai, blockchain, general, all
                         
   --max-total-leads MAX_TOTAL_LEADS
-                        Global limit - stop after this many leads (default: 200)
+                        Global limit - stop after this many leads (default: 500)
+                        
+  --days-filter DAYS_FILTER
+                        Only include content from last N days (default: 30 days, 0 = no filter)
+                        Universal filter for all sources (Reddit, LinkedIn, Discord, Slack)
                         
   --output OUTPUT       Output file path (default: data/leads.json)
   
@@ -151,7 +155,8 @@ optional arguments:
 |----------|------|-------------|---------|
 | `--sources` | Multiple choice | Platforms to scrape from. Options: `reddit`, `discord`, `slack`, `linkedin_public`, `linkedin_apify` | `reddit discord slack` |
 | `--service` | Choice | Keyword preset for targeted scraping. See [Available Services](#available-services) | None (uses all keywords) |
-| `--max-total-leads` | Integer | Global limit to stop after N leads collected | `200` |
+| `--max-total-leads` | Integer | Global limit to stop after N leads collected | `500` |
+| `--days-filter` | Integer | Only include content from last N days (applies to all sources) | `30` (0 = no filter) |
 | `--output` | String | JSON file path for scraped leads | `data/leads.json` |
 | `--no-filter` | Flag | Disable pre-qualification filtering (scrape everything) | False (filtering enabled) |
 | `--qualify` | Flag | Auto-run LLM qualification without prompting | False (will prompt if OpenAI key exists) |
@@ -201,17 +206,17 @@ python main.py --sources reddit --service competitor_frustration_reddit --qualif
 # Find LinkedIn professionals looking to switch from competitors
 python main.py --sources linkedin_apify --service competitor_frustration_linkedin --qualify --max-total-leads 200
 
-# Scrape Reddit for RWA inquiries with LLM qualification
-python main.py --sources reddit --service rwa_reddit --qualify
+# Scrape Reddit for RWA inquiries with 30-day filter and LLM qualification
+python main.py --sources reddit --service rwa --qualify --days-filter 30
 
-# Scrape LinkedIn via Apify for crypto leads
-python main.py --sources linkedin_apify --service crypto_linkedin --qualify
+# Scrape LinkedIn for recent crypto leads (last 7 days)
+python main.py --sources linkedin_apify --service crypto_linkedin --qualify --days-filter 7
 
-# Scrape multiple sources for blockchain leads
-python main.py --sources reddit linkedin_apify --service blockchain --qualify
+# Scrape multiple sources for blockchain leads (last 60 days)
+python main.py --sources reddit linkedin_apify --service blockchain --qualify --days-filter 60
 
-# Limit to 500 leads and export to custom file
-python main.py --sources reddit --service rwa --qualify --max-total-leads 500 --output my_leads.json
+# Limit to 500 leads with custom file and 45-day filter
+python main.py --sources reddit --service rwa --qualify --max-total-leads 500 --days-filter 45 --output my_leads.json
 
 # Filter for specific service during qualification
 python main.py --sources reddit --qualify --filter-service RWA
