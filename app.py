@@ -50,20 +50,31 @@ def run_async_in_thread(coro):
     return thread
 
 
-async def run_scraper(source: str, keywords: list[str]) -> list[Lead]:
+async def run_scraper(source: str, keywords: list[str], days_filter: int = 30, service_filter: str = None) -> list[Lead]:
     """Run a single scraper with timeout and error handling."""
     try:
         if source == 'reddit':
             if not settings.reddit.client_id or not settings.reddit.client_secret:
                 print(f"⚠️ Reddit credentials not configured")
                 return []
+            
+            # Apply service-based subreddit filtering
+            subreddits = settings.reddit.subreddits
+            if service_filter and service_filter in settings.reddit.SERVICE_SUBREDDITS:
+                service_subreddits = settings.reddit.SERVICE_SUBREDDITS[service_filter]
+                # Filter to only subreddits relevant for this service
+                subreddits = [sub for sub in settings.reddit.subreddits if sub in service_subreddits]
+                print(f"🎯 Reddit: Using {len(subreddits)} subreddits for service '{service_filter}'")
+            
             scraper = RedditScraper(
                 client_id=settings.reddit.client_id,
                 client_secret=settings.reddit.client_secret,
                 user_agent=settings.reddit.user_agent,
                 keywords=keywords,
-                subreddits=settings.reddit.subreddits,
-                rate_limit=settings.reddit.rate_limit
+                subreddits=subreddits,
+                rate_limit=settings.reddit.rate_limit,
+                days_filter=days_filter,
+                skip_keyword_filter=True  # Use soft filter for better recall
             )
             # Add 5-minute timeout per source
             return await asyncio.wait_for(scraper.scrape_with_rate_limit(), timeout=300)
@@ -220,6 +231,7 @@ def start_scrape():
         'max_leads': max_leads,
         'qualify': qualify,
         'filter_service': filter_service,
+        'service_preset': service_preset,  # Track which preset was used
         'days_filter': days_filter,
         'started_at': datetime.now().isoformat(),
         'progress': 0,
@@ -228,7 +240,7 @@ def start_scrape():
     }
     
     # Run scraping in background
-    run_async_in_thread(run_scraping_job(job_id, sources, keywords, max_leads, qualify, filter_service, days_filter))
+    run_async_in_thread(run_scraping_job(job_id, sources, keywords, max_leads, qualify, filter_service, days_filter, service_preset))
     
     return jsonify({
         'job_id': job_id,
@@ -237,7 +249,7 @@ def start_scrape():
     })
 
 
-async def run_scraping_job(job_id: str, sources: list, keywords: list, max_leads: int, qualify: bool, filter_service: str, days_filter: int = 30):
+async def run_scraping_job(job_id: str, sources: list, keywords: list, max_leads: int, qualify: bool, filter_service: str, days_filter: int = 30, service_preset: str = None):
     """Run scraping job in background."""
     try:
         # Update max leads and days filter (universal for all sources)
@@ -245,8 +257,8 @@ async def run_scraping_job(job_id: str, sources: list, keywords: list, max_leads
         settings.scraping.days_filter = days_filter  # Universal days filter
         settings.linkedin_apify.days_filter = days_filter  # LinkedIn-specific (kept for backward compat)
         
-        # Run scrapers concurrently
-        tasks = [run_scraper(source, keywords) for source in sources]
+        # Run scrapers concurrently (pass days_filter and service to each scraper)
+        tasks = [run_scraper(source, keywords, days_filter, service_preset) for source in sources]
         results = await asyncio.gather(*tasks, return_exceptions=True)
         
         # Flatten results
