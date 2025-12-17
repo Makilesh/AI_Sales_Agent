@@ -232,20 +232,42 @@ class ScrapingConfig:
         
         # ============================================================
         # 2. RWA TOKENIZATION - BUYER-FOCUSED (Asset owners seeking tokenization)
+        # EXPANDED: 40+ keywords covering explicit, exploratory, and industry terms
         # ============================================================
         'rwa': [
-            # EXPLICIT ASSET OWNER INTENT
+            # EXPLICIT ASSET OWNER INTENT (highest confidence)
             "tokenize my property", "tokenize our assets", "tokenize my real estate",
             "fractional ownership for my", "fractionalize my property",
+            "tokenize my portfolio", "tokenize our portfolio", "tokenize my fund",
             
-            # PROBLEM/SOLUTION SEEKING
-            "how to tokenize real estate", "how to tokenize assets",
-            "need asset tokenization", "looking for tokenization platform",
-            "security token offering help", "STO consultant",
+            # EXPLORATORY/RESEARCH (medium-high confidence)
+            "how to tokenize real estate", "how to tokenize assets", "how to tokenize property",
+            "how to fractionalize", "exploring tokenization", "considering tokenization",
+            "researching tokenization", "evaluating tokenization",
             
-            # INDUSTRY-SPECIFIC BUYER SIGNALS
+            # DIRECT SERVICE SEEKING (very high confidence - B2B signal)
+            "need asset tokenization", "need tokenization platform", "need to tokenize",
+            "looking for tokenization platform", "seeking tokenization service",
+            "want to tokenize", "tokenization consultant", "tokenization agency",
+            "tokenization service", "STO consultant", "security token offering help",
+            
+            # PLATFORM/SOLUTION SPECIFIC (high intent)
             "property tokenization service", "real estate fractionalization",
-            "tokenization for commercial property", "blockchain for real estate investment"
+            "tokenization for commercial property", "blockchain for real estate investment",
+            "tokenization platform", "asset tokenization platform",
+            "fractional real estate platform", "real estate token platform",
+            "sto platform", "security token platform",
+            
+            # INDUSTRY TERMINOLOGY (sophisticated buyers - regulations/compliance aware)
+            "digital securities", "asset-backed tokens", "tokenized securities",
+            "real estate tokens", "property tokens", "security tokens",
+            "reg d tokenization", "reg a+ offering", "506c offering",
+            "accredited investor platform", "private securities",
+            
+            # NATURAL LANGUAGE VARIATIONS (broad catch)
+            "tokenize real estate", "tokenize property", "tokenize assets",
+            "fractional real estate", "fractional ownership", "fractionalize property",
+            "blockchain real estate", "crypto real estate"
         ],
         
         # ============================================================
