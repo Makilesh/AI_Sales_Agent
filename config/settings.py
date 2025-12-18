@@ -178,7 +178,7 @@ class ScrapingConfig:
     # PLATFORM-SPECIFIC KEYWORD PRESETS
     # ===================================================================
     # Reddit vs LinkedIn have different content types and search behaviors
-    # Use --service flag: python main.py --sources reddit --service rwa_reddit
+    # Use --service flag: python main.py --sources reddit --service rwa
     #                or: python main.py --sources linkedin_apify --service rwa_linkedin
     
     # REDDIT BEHAVIOR:
@@ -189,9 +189,10 @@ class ScrapingConfig:
     
     # LINKEDIN BEHAVIOR:
     # - Searches post content (literal keyword matching)
-    # - Professional language
-    # - Mix of announcements, thought leadership, job posts
-    # - Returns posts CONTAINING keywords (not necessarily requests)
+    # - Professional/corporate language
+    # - B2B focused, decision-maker posts
+    # - Industry terminology, regulatory compliance mentions
+    # - Company announcements, professional pain points
     
     # ===================================================================
     # SHAMLA TECH COMPETITORS (India-based Web3/Blockchain firms)
@@ -214,11 +215,11 @@ class ScrapingConfig:
     ]
     
     KEYWORD_PRESETS = {
-        # OPTIMIZED: 8 core presets, 15 keywords each, no platform variants
+        # ============================================================
+        # REDDIT PRESETS (Casual, Help-Seeking Language)
+        # ============================================================
 
-        # ============================================================
-        # 1. COMPETITOR FRUSTRATION (cross-platform)
-        # ============================================================
+        # 1. COMPETITOR FRUSTRATION (Reddit)
         'competitor_frustration': [
             "alternative to Antier", "alternative to LeewayHertz",
             "alternative to Accubits", "alternative to SoluLab",
@@ -230,122 +231,279 @@ class ScrapingConfig:
             "blockchain vendor comparison"
         ],
         
-        # ============================================================
-        # 2. RWA TOKENIZATION - BUYER-FOCUSED (Asset owners seeking tokenization)
-        # EXPANDED: 40+ keywords covering explicit, exploratory, and industry terms
-        # ============================================================
+        # 2. RWA TOKENIZATION (Reddit - Casual Language)
         'rwa': [
-            # EXPLICIT ASSET OWNER INTENT (highest confidence)
+            # EXPLICIT ASSET OWNER INTENT
             "tokenize my property", "tokenize our assets", "tokenize my real estate",
             "fractional ownership for my", "fractionalize my property",
             "tokenize my portfolio", "tokenize our portfolio", "tokenize my fund",
             
-            # EXPLORATORY/RESEARCH (medium-high confidence)
+            # EXPLORATORY/RESEARCH
             "how to tokenize real estate", "how to tokenize assets", "how to tokenize property",
             "how to fractionalize", "exploring tokenization", "considering tokenization",
-            "researching tokenization", "evaluating tokenization",
             
-            # DIRECT SERVICE SEEKING (very high confidence - B2B signal)
+            # DIRECT SERVICE SEEKING
             "need asset tokenization", "need tokenization platform", "need to tokenize",
             "looking for tokenization platform", "seeking tokenization service",
-            "want to tokenize", "tokenization consultant", "tokenization agency",
-            "tokenization service", "STO consultant", "security token offering help",
+            "want to tokenize", "tokenization consultant", "tokenization service",
             
-            # PLATFORM/SOLUTION SPECIFIC (high intent)
+            # PLATFORM SPECIFIC
             "property tokenization service", "real estate fractionalization",
-            "tokenization for commercial property", "blockchain for real estate investment",
             "tokenization platform", "asset tokenization platform",
             "fractional real estate platform", "real estate token platform",
-            "sto platform", "security token platform",
             
-            # INDUSTRY TERMINOLOGY (sophisticated buyers - regulations/compliance aware)
-            "digital securities", "asset-backed tokens", "tokenized securities",
-            "real estate tokens", "property tokens", "security tokens",
-            "reg d tokenization", "reg a+ offering", "506c offering",
-            "accredited investor platform", "private securities",
-            
-            # NATURAL LANGUAGE VARIATIONS (broad catch)
+            # NATURAL LANGUAGE
             "tokenize real estate", "tokenize property", "tokenize assets",
             "fractional real estate", "fractional ownership", "fractionalize property",
             "blockchain real estate", "crypto real estate"
         ],
         
-        # ============================================================
-        # 3. CRYPTO/WEB3 (cross-platform)
-        # ============================================================
+        # 3. CRYPTO/WEB3 (Reddit)
         'crypto': [
-            "crypto developer", "web3 consultant",
-            "DeFi platform", "crypto integration",
-            "smart contract developer", "web3 engineer",
-            "DeFi consultant", "smart contract audit",
-            "crypto payment", "blockchain developer",
-            "need crypto help", "hiring crypto",
-            "web3 project", "DeFi development", "crypto consultant"
+            "crypto developer", "web3 consultant", "DeFi platform",
+            "crypto integration", "smart contract developer", "web3 engineer",
+            "DeFi consultant", "crypto payment", "blockchain developer",
+            "need crypto help", "hiring crypto", "web3 project",
+            "crypto consultant", "web3 agency", "crypto services"
         ],
 
-        # ============================================================
-        # 4. AI/ML (cross-platform)
-        # ============================================================
+        # 4. AI/ML (Reddit)
         'ai': [
-            "AI consultant", "machine learning engineer",
-            "AI automation", "chatbot development",
-            "AI integration", "ML model",
-            "AI developer", "chatbot developer",
-            "ML engineer", "AI specialist",
-            "need AI help", "hiring AI",
-            "AI project", "machine learning consultant", "AI automation project"
+            "AI consultant", "machine learning engineer", "AI automation",
+            "chatbot development", "AI integration", "ML model",
+            "AI developer", "chatbot developer", "ML engineer",
+            "need AI help", "hiring AI", "AI project",
+            "machine learning consultant", "AI services"
         ],
 
-        # ============================================================
-        # 5. BLOCKCHAIN (cross-platform)
-        # ============================================================
+        # 5. BLOCKCHAIN (Reddit)
         'blockchain': [
-            "blockchain consultant", "blockchain developer",
-            "smart contract", "blockchain integration",
-            "distributed ledger", "blockchain architect",
-            "smart contract engineer", "blockchain project",
-            "need blockchain help", "hiring blockchain",
-            "blockchain solution", "smart contract audit",
-            "blockchain platform", "blockchain engineer", "blockchain specialist"
+            "blockchain consultant", "blockchain developer", "smart contract",
+            "blockchain integration", "distributed ledger", "blockchain architect",
+            "blockchain project", "need blockchain help", "hiring blockchain",
+            "blockchain solution", "smart contract audit", "blockchain platform"
         ],
 
-        # ============================================================
-        # 6. WEB3 GENERAL (cross-platform)
-        # ============================================================
+        # 6. WEB3 (Reddit)
         'web3': [
-            "web3 developer", "web3 consultant",
-            "web3 platform", "web3 integration",
-            "web3 project", "web3 engineer",
-            "decentralized app", "dApp developer",
-            "web3 architect", "web3 solution",
-            "need web3 help", "hiring web3",
-            "web3 specialist", "web3 service", "web3 development"
+            "web3 developer", "web3 consultant", "web3 platform",
+            "web3 integration", "web3 project", "decentralized app",
+            "dApp developer", "web3 solution", "need web3 help",
+            "hiring web3", "web3 specialist", "web3 service"
         ],
 
-        # ============================================================
-        # 7. DEFI (cross-platform)
-        # ============================================================
+        # 7. DEFI (Reddit)
         'defi': [
-            "DeFi developer", "DeFi consultant",
-            "DeFi platform", "DeFi protocol",
-            "DeFi integration", "DeFi project",
-            "DeFi engineer", "DeFi solution",
-            "liquidity pool", "yield farming",
-            "staking platform", "DEX development",
-            "DeFi architecture", "need DeFi help", "hiring DeFi"
+            "DeFi developer", "DeFi consultant", "DeFi platform",
+            "DeFi protocol", "DeFi integration", "DeFi project",
+            "liquidity pool", "yield farming", "staking platform",
+            "DEX development", "need DeFi help", "hiring DeFi"
+        ],
+
+        # 8. SMART CONTRACTS (Reddit)
+        'smart_contracts': [
+            "smart contract developer", "smart contract audit", "Solidity developer",
+            "smart contract engineer", "contract security", "Ethereum developer",
+            "smart contract consultant", "need smart contract", "hiring solidity",
+            "smart contract review", "contract audit"
         ],
 
         # ============================================================
-        # 8. SMART CONTRACTS (cross-platform)
+        # LINKEDIN PRESETS (Professional B2B Language)
         # ============================================================
-        'smart_contracts': [
-            "smart contract developer", "smart contract audit",
-            "Solidity developer", "smart contract engineer",
-            "contract security", "smart contract project",
-            "Ethereum developer", "smart contract consultant",
-            "contract development", "smart contract specialist",
-            "need smart contract", "hiring solidity",
-            "smart contract review", "contract audit", "smart contract integration"
+
+        # 9. COMPETITOR FRUSTRATION (LinkedIn - Professional)
+        'competitor_frustration_linkedin': [
+            "seeking alternative to current tokenization provider",
+            "evaluating new blockchain development partners",
+            "looking for reliable RWA tokenization solution",
+            "disappointed with existing Web3 vendor",
+            "transition from current digital asset platform",
+            "seeking experienced tokenization consultants",
+            "need enterprise-grade blockchain solution",
+            "comparing tokenization service providers",
+            "looking for cost-effective RWA solutions",
+            "require better smart contract development partner",
+            "seeking professional blockchain consulting firm",
+            "need scalable tokenization infrastructure",
+            "looking for compliant digital securities platform",
+            "seeking regulatory-compliant tokenization solution",
+            "evaluating blockchain technology partners"
+        ],
+
+        # 10. RWA TOKENIZATION (LinkedIn - Corporate/Professional)
+        # HIGHLY TARGETED: Asset managers, fund managers, real estate professionals
+        'rwa_linkedin': [
+            # EXPLICIT CORPORATE INTENT (C-level, fund managers, asset managers)
+            "seeking tokenization solution for our portfolio",
+            "exploring asset tokenization for institutional clients",
+            "digital transformation of real estate assets",
+            "tokenization strategy for commercial real estate",
+            "fractional ownership platform for investors",
+            "blockchain infrastructure for asset management",
+            "security token offering preparation",
+            "compliant tokenization of alternative assets",
+            
+            # PROFESSIONAL SERVICE SEEKING
+            "partnering with tokenization technology provider",
+            "RWA tokenization consulting engagement",
+            "enterprise asset tokenization platform",
+            "institutional-grade tokenization solution",
+            "blockchain integration for asset management firm",
+            "tokenization service provider for fund management",
+            
+            # INDUSTRY-SPECIFIC (Real Estate, Private Equity, Asset Management)
+            "real estate investment tokenization",
+            "commercial property fractionalization",
+            "private equity token offering",
+            "fund tokenization infrastructure",
+            "alternative asset digitalization",
+            "property token issuance platform",
+            
+            # REGULATORY/COMPLIANCE (Sophisticated buyers)
+            "SEC-compliant tokenization platform",
+            "Reg D digital securities offering",
+            "Reg A+ tokenization services",
+            "accredited investor token platform",
+            "security token compliance solution",
+            "regulated digital asset issuance",
+            
+            # INDUSTRY PAIN POINTS
+            "modernizing asset distribution",
+            "reducing capital formation costs",
+            "improving asset liquidity through blockchain",
+            "streamlining investor onboarding",
+            "automating compliance for digital securities",
+            "democratizing access to alternative investments",
+            
+            # TECHNOLOGY EVALUATION
+            "blockchain technology for asset tokenization",
+            "smart contract platform for securities",
+            "distributed ledger for real estate",
+            "tokenization technology stack",
+            "digital asset management infrastructure",
+            
+            # STRATEGIC INITIATIVES
+            "digital assets transformation program",
+            "blockchain adoption for asset management",
+            "tokenization pilot program",
+            "exploring RWA market opportunities",
+            "building digital securities platform",
+            "launching tokenized investment products"
+        ],
+
+        # 11. CRYPTO/WEB3 (LinkedIn - Enterprise)
+        'crypto_linkedin': [
+            "enterprise blockchain development partner",
+            "Web3 technology integration for business",
+            "corporate crypto payment solutions",
+            "institutional DeFi platform development",
+            "blockchain consulting for enterprises",
+            "Web3 strategy and implementation",
+            "crypto treasury management solutions",
+            "blockchain infrastructure for finance",
+            "enterprise smart contract development",
+            "Web3 digital transformation services",
+            "cryptocurrency integration partner",
+            "decentralized finance for institutions",
+            "blockchain architecture consulting",
+            "Web3 application development agency",
+            "enterprise crypto custody solutions"
+        ],
+
+        # 12. AI/ML (LinkedIn - Enterprise)
+        'ai_linkedin': [
+            "AI transformation consulting engagement",
+            "machine learning implementation partner",
+            "enterprise AI automation solutions",
+            "artificial intelligence strategy consulting",
+            "ML model deployment for business",
+            "AI-powered business intelligence platform",
+            "predictive analytics implementation",
+            "natural language processing solutions",
+            "computer vision integration services",
+            "AI operations and MLOps consulting",
+            "generative AI implementation partner",
+            "enterprise chatbot development",
+            "AI integration for financial services",
+            "machine learning infrastructure consulting",
+            "intelligent automation solutions"
+        ],
+
+        # 13. BLOCKCHAIN (LinkedIn - Enterprise)
+        'blockchain_linkedin': [
+            "enterprise blockchain implementation",
+            "distributed ledger technology consulting",
+            "blockchain architecture for business",
+            "supply chain blockchain solutions",
+            "permissioned blockchain development",
+            "enterprise smart contract platform",
+            "blockchain integration consulting firm",
+            "Hyperledger implementation partner",
+            "private blockchain infrastructure",
+            "blockchain for trade finance",
+            "consortium blockchain development",
+            "blockchain scalability solutions",
+            "enterprise DLT consulting",
+            "blockchain interoperability services",
+            "digital identity blockchain solution"
+        ],
+
+        # 14. WEB3 (LinkedIn - Corporate)
+        'web3_linkedin': [
+            "Web3 transformation consulting",
+            "decentralized application development partner",
+            "Web3 infrastructure consulting",
+            "dApp development for enterprises",
+            "Web3 product development agency",
+            "decentralized technology integration",
+            "Web3 architecture consulting",
+            "NFT platform development services",
+            "metaverse development solutions",
+            "Web3 gaming infrastructure",
+            "decentralized identity solutions",
+            "Web3 marketplace development",
+            "IPFS integration services",
+            "Web3 authentication solutions",
+            "decentralized storage implementation"
+        ],
+
+        # 15. DEFI (LinkedIn - Institutional)
+        'defi_linkedin': [
+            "institutional DeFi solutions",
+            "decentralized finance protocol development",
+            "DeFi lending platform development",
+            "liquidity pool infrastructure",
+            "automated market maker development",
+            "DeFi yield optimization platform",
+            "decentralized exchange development",
+            "DeFi risk management solutions",
+            "institutional staking infrastructure",
+            "DeFi compliance and regulatory solutions",
+            "cross-chain DeFi integration",
+            "DeFi treasury management",
+            "institutional DeFi custody solutions",
+            "DeFi derivatives platform development",
+            "decentralized credit protocol"
+        ],
+
+        # 16. SMART CONTRACTS (LinkedIn - Professional)
+        'smart_contracts_linkedin': [
+            "enterprise smart contract development",
+            "smart contract security audit services",
+            "Solidity development consulting",
+            "smart contract architecture design",
+            "formal verification of smart contracts",
+            "smart contract testing framework",
+            "upgradeable smart contract development",
+            "gas optimization consulting",
+            "multi-signature contract development",
+            "oracle integration for smart contracts",
+            "smart contract monitoring solutions",
+            "Ethereum Layer 2 smart contracts",
+            "cross-chain smart contract development",
+            "smart contract governance implementation",
+            "automated smart contract deployment"
         ],
     }
     

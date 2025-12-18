@@ -530,19 +530,28 @@
                         <label for="servicePreset">🎯 Service Type</label>
                         <select id="servicePreset" name="service_preset">
                             <option value="">-- Select Preset --</option>
-                            <!-- <optgroup label=""> -->
-                                <option value="competitor_frustration">Competitor Frustration (finds dissatisfied leads)</option>
-                                <option value="rwa">RWA Tokenization (56 keywords - optimized)</option>
+                            <optgroup label="🔴 Reddit Presets (Casual Language)">
+                                <option value="competitor_frustration">Competitor Frustration</option>
+                                <option value="rwa">🌟 RWA Tokenization (Recommended)</option>
                                 <option value="crypto">Crypto/Web3 Development</option>
                                 <option value="blockchain">Blockchain Solutions</option>
                                 <option value="web3">Web3 & dApp Development</option>
                                 <option value="defi">DeFi Protocols & Platforms</option>
                                 <option value="smart_contracts">Smart Contract Development</option>
-            
                                 <option value="ai">AI/ML Automation</option>
-                            <!-- </optgroup> -->
+                            </optgroup>
+                            <optgroup label="💼 LinkedIn Presets (Professional B2B)">
+                                <option value="competitor_frustration_linkedin">Competitor Frustration (Corporate)</option>
+                                <option value="rwa_linkedin">🌟 RWA Tokenization (Institutional)</option>
+                                <option value="crypto_linkedin">Crypto/Web3 (Enterprise)</option>
+                                <option value="blockchain_linkedin">Blockchain (Enterprise)</option>
+                                <option value="web3_linkedin">Web3 (Corporate)</option>
+                                <option value="defi_linkedin">DeFi (Institutional)</option>
+                                <option value="smart_contracts_linkedin">Smart Contracts (Professional)</option>
+                                <option value="ai_linkedin">AI/ML (Enterprise)</option>
+                            </optgroup>
                         </select>
-                        <div class="help-text">Cross-platform presets - works with all sources</div>
+                        <div class="help-text">Choose Reddit presets for casual platforms, LinkedIn presets for professional networks</div>
                     </div>
 
                     <!-- Custom Keywords -->
