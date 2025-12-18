@@ -337,9 +337,24 @@ def extract_linkedin_posts(html):
     """Extract post information from LinkedIn HTML."""
     soup = BeautifulSoup(html, 'html.parser')
     posts = []
+    
+    # Try multiple possible class names for LinkedIn posts
     post_elements = soup.find_all('div', class_='feed-shared-update-v2')
+    if not post_elements:
+        # Try search results structure
+        post_elements = soup.find_all('div', {'data-chameleon-result-urn': True})
+    if not post_elements:
+        # Try another common structure
+        post_elements = soup.find_all('li', class_='reusable-search__result-container')
     
     print(f"Found {len(post_elements)} post elements on this page")
+    
+    if len(post_elements) == 0:
+        print("⚠️  No posts extracted - LinkedIn HTML structure may have changed")
+        # Save a sample of HTML for debugging
+        with open('debug_linkedin_html.html', 'w', encoding='utf-8') as f:
+            f.write(html[:5000])  # Save first 5000 chars
+        print("💾 Saved sample HTML to debug_linkedin_html.html for inspection")
     
     for post in post_elements:
         try:
