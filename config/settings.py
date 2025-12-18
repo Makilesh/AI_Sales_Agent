@@ -335,11 +335,14 @@ class ScrapingConfig:
         # OPTIMIZED: Direct client requests only, avoids ads/announcements
         'rwa_linkedin': [
                         # DIRECT HIRING/SEEKING (Active lead signals)
+                "hiring tokenization consultant",
+            "looking for asset tokenization partner",
             "seeking RWA tokenization solution",
-            "need tokenization platform for real estate",                                                                
-            "need fractional ownership platform",  
-            "seeking enterprise tokenization solution",                                                
-            "need solution for asset fractionalization"    
+            "need tokenization platform for real estate",
+            "hiring blockchain developer for tokenization",
+            "looking for security token offering consultant",
+            "seeking asset tokenization developer",
+            "need fractional ownership platform",   
         ],
 
         # 11. CRYPTO/WEB3 (LinkedIn - Lead-Focused)

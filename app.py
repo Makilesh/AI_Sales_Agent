@@ -334,66 +334,74 @@ def search_and_scroll_linkedin(driver, keyword, max_scroll_attempts=10, stop_che
 
 
 def extract_linkedin_posts(html):
-    """Extract post information from LinkedIn HTML."""
+    """Extract post information from LinkedIn HTML - SIMPLIFIED for search results."""
     soup = BeautifulSoup(html, 'html.parser')
     posts = []
     
-    # Try multiple possible class names for LinkedIn posts
+    # LinkedIn search results use different structure than feed
+    # Look for any div that contains post content
     post_elements = soup.find_all('div', class_='feed-shared-update-v2')
     if not post_elements:
-        # Try search results structure
         post_elements = soup.find_all('div', {'data-chameleon-result-urn': True})
     if not post_elements:
-        # Try another common structure
         post_elements = soup.find_all('li', class_='reusable-search__result-container')
     
     print(f"Found {len(post_elements)} post elements on this page")
     
-    if len(post_elements) == 0:
-        print("⚠️  No posts extracted - LinkedIn HTML structure may have changed")
-        # Save a sample of HTML for debugging
-        with open('debug_linkedin_html.html', 'w', encoding='utf-8') as f:
-            f.write(html[:5000])  # Save first 5000 chars
-        print("💾 Saved sample HTML to debug_linkedin_html.html for inspection")
-    
     for post in post_elements:
         try:
-            profile_link = post.find('a', class_='app-aware-link update-components-actor__meta-link')
-            if not profile_link:
-                continue
+            # Try to extract ANY text content from the post
+            # Be more flexible with class names since LinkedIn changes them frequently
             
-            profile_url = profile_link.get('href', '')
-            profile_name = profile_link.find('span', class_='update-components-actor__name')
-            profile_name = profile_name.text.strip() if profile_name else "Name not found"
+            # Find author name - try multiple selectors
+            profile_name = "Unknown Author"
+            author_elem = (post.find('span', class_=lambda x: x and 'actor__name' in x if x else False) or
+                          post.find('span', {'aria-hidden': 'true'}) or
+                          post.find('a', class_=lambda x: x and 'app-aware-link' in x if x else False))
+            if author_elem:
+                profile_name = author_elem.get_text(strip=True)
             
-            profile_title = profile_link.find('span', class_='update-components-actor__description')
-            profile_title = profile_title.text.strip() if profile_title else "Title not found"
+            # Find profile URL
+            profile_url = ""
+            profile_link = post.find('a', href=lambda x: x and '/in/' in x if x else False)
+            if profile_link:
+                profile_url = profile_link.get('href', '')
             
-            connection_degree = profile_link.find('span', class_='update-components-actor__supplementary-actor-info')
-            connection_degree = connection_degree.text.strip() if connection_degree else "Connection degree not found"
+            # Find post content - be VERY flexible
+            content = ""
+            content_elem = (post.find('div', class_=lambda x: x and ('commentary' in x or 'description' in x or 'text' in x) if x else False) or
+                           post.find('span', class_=lambda x: x and ('text' in x or 'break-words' in x) if x else False))
             
-            timestamp = post.find('span', class_='update-components-actor__sub-description')
-            timestamp = timestamp.text.strip() if timestamp else "Timestamp not found"
+            if content_elem:
+                content = content_elem.get_text(strip=True, separator=' ')
             
-            content_section = post.find('div', class_='feed-shared-update-v2__description-wrapper')
-            content = content_section.text.strip() if content_section else "No content"
+            # If still no content, grab ALL text from the post element
+            if not content or len(content) < 20:
+                content = post.get_text(strip=True, separator=' ')
             
-            hashtags = [tag.text for tag in
-                        post.find_all('a', class_='feed-shared-text-view__mention')] if content_section else []
+            # Find timestamp
+            timestamp = "Unknown time"
+            time_elem = post.find('time') or post.find('span', class_=lambda x: x and 'sub-description' in x if x else False)
+            if time_elem:
+                timestamp = time_elem.get_text(strip=True)
             
-            posts.append({
-                'profile_name': profile_name,
-                'profile_title': profile_title,
-                'profile_url': profile_url,
-                'connection_degree': connection_degree,
-                'timestamp': timestamp,
-                'content': content,
-                'hashtags': ', '.join(hashtags)
-            })
+            # Only add if we have meaningful content
+            if content and len(content) > 20:
+                posts.append({
+                    'profile_name': profile_name,
+                    'profile_title': 'LinkedIn User',  # Simplified
+                    'profile_url': profile_url,
+                    'connection_degree': 'N/A',
+                    'timestamp': timestamp,
+                    'content': content[:2000],  # Limit content length
+                    'hashtags': ''
+                })
         
-        except AttributeError as e:
-            print(f"Error extracting post data: {e}")
+        except Exception as e:
+            print(f"⚠️  Error extracting post: {e}")
+            continue
     
+    print(f"✓ Successfully extracted {len(posts)} posts from {len(post_elements)} elements")
     return posts
 
 
