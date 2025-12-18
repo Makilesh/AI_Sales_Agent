@@ -331,179 +331,111 @@ class ScrapingConfig:
             "evaluating blockchain technology partners"
         ],
 
-        # 10. RWA TOKENIZATION (LinkedIn - Corporate/Professional)
-        # HIGHLY TARGETED: Asset managers, fund managers, real estate professionals
+        # 10. RWA TOKENIZATION (LinkedIn - Lead-Focused)
+        # OPTIMIZED: Direct client requests only, avoids ads/announcements
         'rwa_linkedin': [
-            # EXPLICIT CORPORATE INTENT (C-level, fund managers, asset managers)
-            "seeking tokenization solution for our portfolio",
-            "exploring asset tokenization for institutional clients",
-            "digital transformation of real estate assets",
-            "tokenization strategy for commercial real estate",
-            "fractional ownership platform for investors",
-            "blockchain infrastructure for asset management",
-            "security token offering preparation",
-            "compliant tokenization of alternative assets",
-            
-            # PROFESSIONAL SERVICE SEEKING
-            "partnering with tokenization technology provider",
-            "RWA tokenization consulting engagement",
-            "enterprise asset tokenization platform",
-            "institutional-grade tokenization solution",
-            "blockchain integration for asset management firm",
-            "tokenization service provider for fund management",
-            
-            # INDUSTRY-SPECIFIC (Real Estate, Private Equity, Asset Management)
-            "real estate investment tokenization",
-            "commercial property fractionalization",
-            "private equity token offering",
-            "fund tokenization infrastructure",
-            "alternative asset digitalization",
-            "property token issuance platform",
-            
-            # REGULATORY/COMPLIANCE (Sophisticated buyers)
-            "SEC-compliant tokenization platform",
-            "Reg D digital securities offering",
-            "Reg A+ tokenization services",
-            "accredited investor token platform",
-            "security token compliance solution",
-            "regulated digital asset issuance",
-            
-            # INDUSTRY PAIN POINTS
-            "modernizing asset distribution",
-            "reducing capital formation costs",
-            "improving asset liquidity through blockchain",
-            "streamlining investor onboarding",
-            "automating compliance for digital securities",
-            "democratizing access to alternative investments",
-            
-            # TECHNOLOGY EVALUATION
-            "blockchain technology for asset tokenization",
-            "smart contract platform for securities",
-            "distributed ledger for real estate",
-            "tokenization technology stack",
-            "digital asset management infrastructure",
-            
-            # STRATEGIC INITIATIVES
-            "digital assets transformation program",
-            "blockchain adoption for asset management",
-            "tokenization pilot program",
-            "exploring RWA market opportunities",
-            "building digital securities platform",
-            "launching tokenized investment products"
+                        # DIRECT HIRING/SEEKING (Active lead signals)
+            "seeking RWA tokenization solution",
+            "need tokenization platform for real estate",                                                                
+            "need fractional ownership platform",  
+            "seeking enterprise tokenization solution",                                                
+            "need solution for asset fractionalization"    
         ],
 
-        # 11. CRYPTO/WEB3 (LinkedIn - Enterprise)
+        # 11. CRYPTO/WEB3 (LinkedIn - Lead-Focused)
         'crypto_linkedin': [
-            "enterprise blockchain development partner",
-            "Web3 technology integration for business",
-            "corporate crypto payment solutions",
-            "institutional DeFi platform development",
-            "blockchain consulting for enterprises",
-            "Web3 strategy and implementation",
-            "crypto treasury management solutions",
-            "blockchain infrastructure for finance",
-            "enterprise smart contract development",
-            "Web3 digital transformation services",
-            "cryptocurrency integration partner",
-            "decentralized finance for institutions",
-            "blockchain architecture consulting",
-            "Web3 application development agency",
-            "enterprise crypto custody solutions"
+            "hiring blockchain developer",
+            "looking for Web3 consultant",
+            "need crypto integration partner",
+            "seeking DeFi platform developer",
+            "hiring smart contract developer",
+            "looking for blockchain consulting firm",
+            "need Web3 development team",
+            "seeking cryptocurrency integration expert",
+            "hiring Web3 architect",
+            "looking for enterprise blockchain solution",
+            "need crypto payment integration",
+            "seeking blockchain infrastructure consultant"
         ],
 
-        # 12. AI/ML (LinkedIn - Enterprise)
+        # 12. AI/ML (LinkedIn - Lead-Focused)
         'ai_linkedin': [
-            "AI transformation consulting engagement",
-            "machine learning implementation partner",
-            "enterprise AI automation solutions",
-            "artificial intelligence strategy consulting",
-            "ML model deployment for business",
-            "AI-powered business intelligence platform",
-            "predictive analytics implementation",
-            "natural language processing solutions",
-            "computer vision integration services",
-            "AI operations and MLOps consulting",
-            "generative AI implementation partner",
-            "enterprise chatbot development",
-            "AI integration for financial services",
-            "machine learning infrastructure consulting",
-            "intelligent automation solutions"
+            "hiring AI consultant",
+            "looking for machine learning engineer",
+            "need AI automation solution",
+            "seeking ML implementation partner",
+            "hiring data scientist for AI",
+            "looking for chatbot development expert",
+            "need AI integration consultant",
+            "seeking generative AI developer",
+            "hiring NLP specialist",
+            "looking for computer vision expert",
+            "need AI transformation consultant",
+            "seeking MLOps engineer"
         ],
 
-        # 13. BLOCKCHAIN (LinkedIn - Enterprise)
+        # 13. BLOCKCHAIN (LinkedIn - Lead-Focused)
         'blockchain_linkedin': [
-            "enterprise blockchain implementation",
-            "distributed ledger technology consulting",
-            "blockchain architecture for business",
-            "supply chain blockchain solutions",
-            "permissioned blockchain development",
-            "enterprise smart contract platform",
-            "blockchain integration consulting firm",
-            "Hyperledger implementation partner",
-            "private blockchain infrastructure",
-            "blockchain for trade finance",
-            "consortium blockchain development",
-            "blockchain scalability solutions",
-            "enterprise DLT consulting",
-            "blockchain interoperability services",
-            "digital identity blockchain solution"
+            "hiring blockchain consultant",
+            "looking for blockchain developer",
+            "need distributed ledger expert",
+            "seeking blockchain architect",
+            "hiring smart contract engineer",
+            "looking for Hyperledger consultant",
+            "need blockchain integration partner",
+            "seeking supply chain blockchain developer",
+            "hiring blockchain security expert",
+            "looking for enterprise blockchain solution",
+            "need blockchain implementation consultant",
+            "seeking DLT developer"
         ],
 
-        # 14. WEB3 (LinkedIn - Corporate)
+        # 14. WEB3 (LinkedIn - Lead-Focused)
         'web3_linkedin': [
-            "Web3 transformation consulting",
-            "decentralized application development partner",
-            "Web3 infrastructure consulting",
-            "dApp development for enterprises",
-            "Web3 product development agency",
-            "decentralized technology integration",
-            "Web3 architecture consulting",
-            "NFT platform development services",
-            "metaverse development solutions",
-            "Web3 gaming infrastructure",
-            "decentralized identity solutions",
-            "Web3 marketplace development",
-            "IPFS integration services",
-            "Web3 authentication solutions",
-            "decentralized storage implementation"
+            "hiring Web3 developer",
+            "looking for dApp consultant",
+            "need Web3 architect",
+            "seeking decentralized app developer",
+            "hiring NFT platform developer",
+            "looking for Web3 integration expert",
+            "need metaverse development partner",
+            "seeking Web3 infrastructure consultant",
+            "hiring decentralized identity expert",
+            "looking for IPFS specialist",
+            "need Web3 marketplace developer",
+            "seeking Web3 consultant"
         ],
 
-        # 15. DEFI (LinkedIn - Institutional)
+        # 15. DEFI (LinkedIn - Lead-Focused)
         'defi_linkedin': [
-            "institutional DeFi solutions",
-            "decentralized finance protocol development",
-            "DeFi lending platform development",
-            "liquidity pool infrastructure",
-            "automated market maker development",
-            "DeFi yield optimization platform",
-            "decentralized exchange development",
-            "DeFi risk management solutions",
-            "institutional staking infrastructure",
-            "DeFi compliance and regulatory solutions",
-            "cross-chain DeFi integration",
-            "DeFi treasury management",
-            "institutional DeFi custody solutions",
-            "DeFi derivatives platform development",
-            "decentralized credit protocol"
+            "hiring DeFi developer",
+            "looking for DeFi consultant",
+            "need DeFi protocol developer",
+            "seeking liquidity pool expert",
+            "hiring DEX developer",
+            "looking for DeFi integration partner",
+            "need staking platform developer",
+            "seeking DeFi smart contract developer",
+            "hiring yield farming expert",
+            "looking for DeFi architect",
+            "need DeFi security consultant",
+            "seeking automated market maker developer"
         ],
 
-        # 16. SMART CONTRACTS (LinkedIn - Professional)
+        # 16. SMART CONTRACTS (LinkedIn - Lead-Focused)
         'smart_contracts_linkedin': [
-            "enterprise smart contract development",
-            "smart contract security audit services",
-            "Solidity development consulting",
-            "smart contract architecture design",
-            "formal verification of smart contracts",
-            "smart contract testing framework",
-            "upgradeable smart contract development",
-            "gas optimization consulting",
-            "multi-signature contract development",
-            "oracle integration for smart contracts",
-            "smart contract monitoring solutions",
-            "Ethereum Layer 2 smart contracts",
-            "cross-chain smart contract development",
-            "smart contract governance implementation",
-            "automated smart contract deployment"
+            "hiring smart contract developer",
+            "looking for Solidity expert",
+            "need smart contract auditor",
+            "seeking smart contract consultant",
+            "hiring Ethereum developer",
+            "looking for smart contract security expert",
+            "need smart contract architect",
+            "seeking Solidity developer",
+            "hiring Web3 smart contract engineer",
+            "looking for smart contract audit firm",
+            "need gas optimization consultant",
+            "seeking smart contract testing expert"
         ],
     }
     

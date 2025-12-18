@@ -426,11 +426,14 @@ async def run_linkedin_selenium2_scraper(keywords: list[str], settings: dict, jo
     """Run LinkedIn Selenium2 scraper asynchronously in Flask background job."""
     try:
         print("\n=== Starting LinkedIn Selenium2 scraping ===")
+        print(f"📋 Settings received: {settings}")
         scroll_attempts = settings.get('scroll_attempts', 10)
         username = settings.get('username', '')
         password = settings.get('password', '')
-        headless = settings.get('headless', True)
-        manual_login = settings.get('manual_login', False)
+        headless = settings.get('headless', False)  # Default to visible browser
+        manual_login = settings.get('manual_login', True)  # Default to manual login
+        
+        print(f"🔧 Configuration: headless={headless}, manual_login={manual_login}")
         
         # Helper function to check if stop was requested
         def should_stop():
