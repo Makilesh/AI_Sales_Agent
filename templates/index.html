@@ -932,8 +932,9 @@
                 currentJobId = result.job_id;
                 showAlert(`✅ Scraping job started: ${currentJobId}`, 'success');
 
-                // Show progress container
+                // Show progress container and stop button
                 document.getElementById('progressContainer').style.display = 'block';
+                document.getElementById('stopBtn').style.display = 'block';
 
                 // Start checking status
                 statusCheckInterval = setInterval(checkJobStatus, 2000);
@@ -983,9 +984,10 @@
                     loadJobs();
                     loadStats();
 
-                    // Hide progress after 5 seconds
+                    // Hide progress and stop button after 5 seconds
                     setTimeout(() => {
                         document.getElementById('progressContainer').style.display = 'none';
+                        document.getElementById('stopBtn').style.display = 'none';
                     }, 5000);
                 }
 
@@ -1015,6 +1017,33 @@
             setTimeout(() => {
                 alertBox.style.display = 'none';
             }, 5000);
+        }
+
+        // Stop scraping function
+        async function stopScraping() {
+            if (!currentJobId) return;
+            
+            if (!confirm('Stop scraping now and process collected leads?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/jobs/${currentJobId}/stop`, {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showAlert('⏹️ Stopping scraping... Processing collected leads', 'info');
+                    document.getElementById('stopBtn').disabled = true;
+                    document.getElementById('stopBtn').textContent = '⏳ Stopping...';
+                } else {
+                    showAlert('❌ Error: ' + result.error, 'error');
+                }
+            } catch (error) {
+                showAlert('❌ Error stopping job: ' + error.message, 'error');
+            }
         }
 
         // Toggle LinkedIn Selenium2 settings based on checkbox

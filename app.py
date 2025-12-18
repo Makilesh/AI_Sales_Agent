@@ -262,7 +262,8 @@ def start_scrape():
         'started_at': datetime.now().isoformat(),
         'progress': 0,
         'leads_found': 0,
-        'qualified_count': 0
+        'qualified_count': 0,
+        'stop_requested': False  # Flag for early stopping
     }
     
     # Run scraping in background
@@ -275,7 +276,7 @@ def start_scrape():
     })
 
 
-def search_and_scroll_linkedin(driver, keyword, max_scroll_attempts=10):
+def search_and_scroll_linkedin(driver, keyword, max_scroll_attempts=10, stop_check=None):
     """Search for keyword and scroll through LinkedIn results."""
     all_posts = []
     search_url = f"https://www.linkedin.com/search/results/content/?keywords={keyword}&origin=GLOBAL_SEARCH_HEADER"
@@ -283,6 +284,10 @@ def search_and_scroll_linkedin(driver, keyword, max_scroll_attempts=10):
     
     scroll_attempts = 0
     while scroll_attempts < max_scroll_attempts:
+        # Check if stop was requested
+        if stop_check and stop_check():
+            print(f"⏹️ Stop requested. Collected {len(all_posts)} posts so far for '{keyword}'")
+            break
         print(f"Scrolling attempt {scroll_attempts + 1}/{max_scroll_attempts}...")
         
         driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
@@ -417,7 +422,7 @@ def login_to_linkedin_auto(driver, username, password):
         return False
 
 
-async def run_linkedin_selenium2_scraper(keywords: list[str], settings: dict) -> list[Lead]:
+async def run_linkedin_selenium2_scraper(keywords: list[str], settings: dict, job_id: str) -> list[Lead]:
     """Run LinkedIn Selenium2 scraper asynchronously in Flask background job."""
     try:
         print("\n=== Starting LinkedIn Selenium2 scraping ===")
@@ -426,6 +431,10 @@ async def run_linkedin_selenium2_scraper(keywords: list[str], settings: dict) ->
         password = settings.get('password', '')
         headless = settings.get('headless', True)
         manual_login = settings.get('manual_login', False)
+        
+        # Helper function to check if stop was requested
+        def should_stop():
+            return scraping_jobs.get(job_id, {}).get('stop_requested', False)
         
         # Setup Chrome options
         chrome_options = Options()
@@ -502,9 +511,20 @@ async def run_linkedin_selenium2_scraper(keywords: list[str], settings: dict) ->
         # Scrape for each keyword
         all_posts = []
         for keyword in keywords:
+            # Check if stop was requested before starting new keyword
+            if should_stop():
+                print(f"⏹️ Stop requested. Stopping after {len(keywords.index(keyword))} keyword(s)")
+                break
+                
             print(f"Searching for keyword: {keyword}")
-            posts = search_and_scroll_linkedin(driver, keyword, scroll_attempts)
+            posts = search_and_scroll_linkedin(driver, keyword, scroll_attempts, should_stop)
             all_posts.extend(posts)
+            
+            # Check again before waiting
+            if should_stop():
+                print(f"⏹️ Stop requested. Skipping remaining keywords.")
+                break
+                
             time.sleep(random.uniform(5, 10))
         
         # Remove duplicates
@@ -516,7 +536,8 @@ async def run_linkedin_selenium2_scraper(keywords: list[str], settings: dict) ->
                 seen.add(post_key)
                 unique_posts.append(post)
         
-        print(f"✓ LinkedIn Selenium2: Found {len(unique_posts)} unique posts")
+        was_stopped = should_stop()
+        print(f"✓ LinkedIn Selenium2: Found {len(unique_posts)} unique posts{' (stopped early)' if was_stopped else ''}")
         
         # Convert to Lead objects
         leads = []
@@ -562,7 +583,8 @@ async def run_scraping_job(job_id: str, sources: list, keywords: list, max_leads
             print("🔧 Running LinkedIn Selenium2 scraper (opens browser automatically)...")
             linkedin_selenium2_leads = await run_linkedin_selenium2_scraper(
                 keywords, 
-                selenium2_settings or {}
+                selenium2_settings or {},
+                job_id
             )
         
         # Run other scrapers concurrently (pass days_filter and service to each scraper)
@@ -642,6 +664,26 @@ def get_job_status(job_id):
         return jsonify({'error': 'Job not found'}), 404
     
     return jsonify(scraping_jobs[job_id])
+
+
+@app.route('/api/jobs/<job_id>/stop', methods=['POST'])
+def stop_job(job_id):
+    """Request to stop a scraping job early."""
+    if job_id not in scraping_jobs:
+        return jsonify({'error': 'Job not found'}), 404
+    
+    job = scraping_jobs[job_id]
+    
+    if job['status'] not in ['running', 'qualifying']:
+        return jsonify({'error': 'Job is not running'}), 400
+    
+    job['stop_requested'] = True
+    print(f"⏹️ Stop requested for job {job_id}")
+    
+    return jsonify({
+        'message': 'Stop request received. Job will finish current operation and process collected leads.',
+        'status': 'stopping'
+    })
 
 
 @app.route('/api/jobs', methods=['GET'])
