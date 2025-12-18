@@ -186,10 +186,24 @@ async def run_scraper(source: str, keywords: list[str], days_filter: int = 30, s
         return []
 
 
+@app.route('/test')
+def test():
+    """Simple test endpoint."""
+    print("✅ Test endpoint accessed!")
+    return "<h1>Flask is working!</h1><p>If you see this, the server is running correctly.</p>"
+
+
 @app.route('/')
 def index():
     """Render main page."""
-    return render_template('index.html')
+    try:
+        print("🔍 Attempting to render index.html...")
+        rendered = render_template('index.html')
+        print(f"✅ Template rendered successfully ({len(rendered)} bytes)")
+        return rendered
+    except Exception as e:
+        print(f"❌ Error rendering template: {e}")
+        return f"Error: {e}", 500
 
 
 @app.route('/api/config', methods=['GET'])
@@ -769,12 +783,11 @@ def get_stats():
 
 
 if __name__ == '__main__':
-    # Open browser automatically after a short delay
-    def open_browser():
-        time.sleep(1.5)  # Wait for server to start
-        webbrowser.open('http://127.0.0.1:5000')
-    
-    threading.Thread(target=open_browser, daemon=True).start()
-    
-    # Run Flask app
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    # Run Flask app without auto-reload
+    print("\n🌐 Open your browser and go to: http://127.0.0.1:5000\n")
+    app.run(
+        debug=True, 
+        host='0.0.0.0', 
+        port=5000,
+        use_reloader=False  # Disable auto-reload to prevent restarts
+    )
