@@ -4,6 +4,7 @@ import asyncio
 import json
 import os
 import threading
+import webbrowser
 from datetime import datetime
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify, send_file
@@ -768,5 +769,12 @@ def get_stats():
 
 
 if __name__ == '__main__':
+    # Open browser automatically after a short delay
+    def open_browser():
+        time.sleep(1.5)  # Wait for server to start
+        webbrowser.open('http://127.0.0.1:5000')
+    
+    threading.Thread(target=open_browser, daemon=True).start()
+    
     # Run Flask app
     app.run(debug=True, host='0.0.0.0', port=5000)
