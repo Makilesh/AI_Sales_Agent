@@ -583,20 +583,26 @@ async def run_linkedin_selenium2_scraper(keywords: list[str], settings: dict, jo
         # Convert to Lead objects
         leads = []
         for post in unique_posts:
-            lead = Lead(
-                source="linkedin_selenium2",
-                content=post['content'],
-                author=post['profile_name'],
-                author_profile=post['profile_url'],
-                author_info=post['profile_title'],
-                timestamp=post['timestamp'],
-                url=post['profile_url'],
-                additional_data={
-                    'connection_degree': post['connection_degree'],
-                    'hashtags': post['hashtags']
-                }
-            )
-            leads.append(lead)
+            try:
+                lead = Lead(
+                    source="linkedin_selenium2",
+                    author=post['profile_name'],
+                    content=post['content'],
+                    timestamp=datetime.now(),  # Use current time since LinkedIn doesn't give exact timestamps
+                    url=post['profile_url'] if post['profile_url'] else "https://www.linkedin.com",
+                    title=None,  # LinkedIn posts don't have titles
+                    metadata={
+                        'profile_title': post['profile_title'],
+                        'connection_degree': post['connection_degree'],
+                        'hashtags': post['hashtags'],
+                        'original_timestamp': post['timestamp']
+                    },
+                    linkedin_post_type='post'
+                )
+                leads.append(lead)
+            except Exception as e:
+                print(f"⚠️  Error creating Lead object: {e}")
+                continue
         
         driver.quit()
         return leads
