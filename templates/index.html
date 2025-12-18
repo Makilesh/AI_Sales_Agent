@@ -518,6 +518,10 @@
                                 <input type="checkbox" id="linkedin_sl" name="sources" value="linkedin_sl">
                                 <label for="linkedin_sl" style="margin: 0;">LinkedIn Selenium</label>
                             </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="linkedin_selenium2" name="sources" value="linkedin_selenium2">
+                                <label for="linkedin_selenium2" style="margin: 0;">LinkedIn Selenium2 (Auto Login)</label>
+                            </div>
                         </div>
                     </div>
 
@@ -597,6 +601,49 @@
                             <option value="Blockchain">Blockchain Only</option>
                             <option value="Web3">Web3 Only</option>
                         </select>
+                    </div>
+
+                    <!-- LinkedIn Selenium2 Settings (only shown when selected) -->
+                    <div id="linkedinSelenium2Settings" style="display: none;">
+                        <hr style="margin: 25px 0; border: none; border-top: 2px solid #e0e0e0;">
+                        <h3 style="color: #667eea; font-size: 1.2em; margin-bottom: 15px;">🔧 LinkedIn Selenium2 Settings</h3>
+                        
+                        <div class="form-group">
+                            <label>Login Method</label>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="selenium2ManualLogin" name="selenium2_manual_login" checked>
+                                <label for="selenium2ManualLogin" style="margin: 0;">Manual Login (Handles Security Checks)</label>
+                            </div>
+                            <div class="help-text">✅ Opens visible browser for you to login manually, handles verification</div>
+                        </div>
+
+                        <div id="selenium2Credentials">
+                            <div class="form-group">
+                                <label for="selenium2Username">LinkedIn Username/Email</label>
+                                <input type="text" id="selenium2Username" name="selenium2_username" placeholder="your.email@example.com">
+                                <div class="help-text">Required for automatic login</div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="selenium2Password">LinkedIn Password</label>
+                                <input type="password" id="selenium2Password" name="selenium2_password" placeholder="Enter password">
+                                <div class="help-text">⚠️ Used for automatic login, not stored permanently</div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="selenium2ScrollAttempts">Max Scroll Attempts</label>
+                            <input type="number" id="selenium2ScrollAttempts" name="selenium2_scroll_attempts" value="10" min="1" max="100">
+                            <div class="help-text">Number of times to scroll through LinkedIn search results</div>
+                        </div>
+
+                        <div class="alert" id="manualLoginInstructions" style="display: block; background: #fff3cd; color: #856404; border: 1px solid #ffeaa7;">
+                            📋 <strong>Manual Login Steps:</strong><br>
+                            1. Click 'Start Scraping' - A browser will open<br>
+                            2. Login to LinkedIn manually (handle any security checks)<br>
+                            3. Wait until you see your LinkedIn feed<br>
+                            4. Scraping will start automatically after successful login
+                        </div>
                     </div>
 
                     <!-- Minimum Confidence -->
@@ -828,6 +875,28 @@
                 daysFilter = parseInt(daysFilterSelect);
             }
 
+            // LinkedIn Selenium2 settings
+            const selenium2Settings = {};
+            if (sources.includes('linkedin_selenium2')) {
+                selenium2Settings.manual_login = document.getElementById('selenium2ManualLogin').checked;
+                
+                if (!selenium2Settings.manual_login) {
+                    // Automatic login - require credentials
+                    selenium2Settings.username = document.getElementById('selenium2Username').value;
+                    selenium2Settings.password = document.getElementById('selenium2Password').value;
+                    if (!selenium2Settings.username || !selenium2Settings.password) {
+                        showAlert('Please provide LinkedIn credentials for automatic login', 'error');
+                        return;
+                    }
+                    selenium2Settings.headless = true;
+                } else {
+                    // Manual login - visible browser, no credentials needed
+                    selenium2Settings.headless = false;
+                }
+                
+                selenium2Settings.scroll_attempts = parseInt(document.getElementById('selenium2ScrollAttempts').value) || 10;
+            }
+
             // Prepare request data
             const requestData = {
                 sources,
@@ -837,7 +906,8 @@
                 days_filter: daysFilter,
                 qualify,
                 filter_service: filterService || null,
-                min_confidence: minConfidence
+                min_confidence: minConfidence,
+                selenium2_settings: selenium2Settings
             };
 
             try {
@@ -946,6 +1016,25 @@
                 alertBox.style.display = 'none';
             }, 5000);
         }
+
+        // Toggle LinkedIn Selenium2 settings based on checkbox
+        document.getElementById('linkedin_selenium2').addEventListener('change', function(e) {
+            const settings = document.getElementById('linkedinSelenium2Settings');
+            settings.style.display = e.target.checked ? 'block' : 'none';
+        });
+
+        // Toggle credentials based on manual login checkbox
+        document.getElementById('selenium2ManualLogin').addEventListener('change', function(e) {
+            const credentials = document.getElementById('selenium2Credentials');
+            const instructions = document.getElementById('manualLoginInstructions');
+            if (e.target.checked) {
+                credentials.style.display = 'none';
+                instructions.style.display = 'block';
+            } else {
+                credentials.style.display = 'block';
+                instructions.style.display = 'none';
+            }
+        });
 
         // Load on page ready
         document.addEventListener('DOMContentLoaded', loadConfig);
