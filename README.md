@@ -392,10 +392,12 @@ LINKEDIN_APIFY_ACTOR=supreme_coder/linkedin-post
 LINKEDIN_PUBLIC_ENABLED=false
 LINKEDIN_COOKIE=your_li_at_cookie
 
+
 # OpenAI (Primary LLM - Required)
 OPENAI_API_KEY=sk-proj-your_openai_key
 LLM_MODEL=gpt-4-turbo
-MIN_CONFIDENCE_SCORE=0.7
+# Default min confidence for RWA leads is now 0.60 (was 0.7)
+MIN_CONFIDENCE_SCORE=0.6
 MAX_CONCURRENT_LLM_REQUESTS=5
 
 # Gemini (Fallback LLM - Optional but Recommended)
@@ -409,6 +411,19 @@ Customize:
 - Rate limits per platform
 - Engagement thresholds
 - Pre-validation parameters
+
+## Enhanced RWA Lead Qualification (2024)
+
+### Expanded LLM Prompt Logic
+- The LLM prompt now recognizes both explicit and implicit RWA/real-world asset and **alternative financing** signals.
+- Leads mentioning "alternative financing", "tokenization", "real estate onchain", or similar are now qualified as RWA.
+- The filter is less strict, catching more high-value but subtle RWA leads.
+- Context window for LLM validation is increased for real estate and RWA-related posts.
+
+### RWA Service Filter
+- The RWA filter now includes leads seeking alternative financing, tokenization, or real estate onchain solutions.
+- Default min-confidence for RWA is 0.60 (CLI and web UI).
+- UI and CLI options are updated to match this logic.
 
 ## Output Files
 
@@ -453,9 +468,10 @@ Customize:
 - Leads continue processing seamlessly with backup provider
 
 ### No Qualified Leads
-- Check `MIN_CONFIDENCE_SCORE` in .env (default: 0.7)
+- Check `MIN_CONFIDENCE_SCORE` in .env (default: 0.6 for RWA)
 - Review pre-validation logic in `config/settings.py`
 - Most leads are discussions, not inquiries (strict filtering by design)
+- If targeting RWA, ensure your queries include "alternative financing" and related terms for best results.
 
 ### LinkedIn Ban Risk
 - Use Apify integration instead of public scraping
