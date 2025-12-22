@@ -50,30 +50,29 @@ class LLMLeadQualifier:
                 self.gemini_model = None
     
     def _build_qualification_prompt(self, lead: Lead) -> str:
-        """Lean qualification prompt - 300 tokens max, no examples."""
-        # OPTIMIZED: Use first 300 chars only (vs 2000 before)
-        content = lead.content[:300]
+        """Lean qualification prompt - optimized length based on source."""
+        # OPTIMIZED: Use more context for real estate leads (they often bury the ask)
+        # Real estate posts often start with backstory before getting to financing needs
+        content_length = 500 if lead.subreddit in ['realestateinvesting', 'CommercialRealEstate', 'RealEstate'] else 300
+        content = lead.content[:content_length]
         title = lead.title or ""
         full_text = f"{title}\n\n{content}" if title else content
 
-        # Service filter (if applicable) - STRENGTHENED FOR STRICT FILTERING
+        # Service filter (if applicable) - ENHANCED TO CATCH ALTERNATIVE FINANCING SIGNALS
         service_filter = ""
         if self.target_service:
             if self.target_service.upper() == 'RWA':
-                service_filter = """**🚨 CRITICAL: ONLY QUALIFY RWA TOKENIZATION LEADS. REJECT ALL OTHER SERVICES.**
+                # NO STRICT KEYWORD FILTER - Let the service_context below handle qualification
+                service_filter = """**🚨 CRITICAL: ONLY QUALIFY RWA/TOKENIZATION LEADS. REJECT ALL OTHER SERVICES.**
 
-**REQUIRED RWA KEYWORDS (must have at least one):**
-- "tokenize", "tokenization", "tokenizing"
-- "RWA", "real world asset", "real-world asset"
-- "fractional ownership", "fractionalize"
-- "security token", "STO", "asset-backed token"
+**IMPORTANT:** This is RWA-ONLY mode. Accept leads seeking asset tokenization, fractional ownership, 
+OR alternative financing for real assets (property owners seeking creative financing solutions).
 
 **REJECT IMMEDIATELY IF:**
-- Crypto/Web3 development (unless specifically about asset tokenization)
 - AI/ML services (not RWA)
 - General blockchain development (unless tokenization-related)
-- Smart contracts (unless for tokenization)
-- DeFi projects (unless RWA-focused)
+- Crypto payments/wallets (no real world assets)
+- Pure DeFi (unless RWA-focused)
 """
             elif self.target_service.upper() == 'CRYPTO':
                 service_filter = f"""**🚨 CRITICAL: ONLY QUALIFY CRYPTO/WEB3 LEADS. REJECT RWA/AI/OTHER SERVICES.**
@@ -214,8 +213,13 @@ JSON: {{"is_qualified": true/false, "confidence_score": 0.0-1.0, "reason": "[ACC
         
         # Check if target service is in the matched services
         if self.target_service.upper() == 'RWA':
-            # For RWA, require "RWA", "tokenization", or "tokenize" in service match
-            rwa_keywords = ['rwa', 'tokenization', 'tokenize', 'asset tokenization', 'real world']
+            # For RWA, accept tokenization keywords OR alternative financing terms
+            rwa_keywords = [
+                'rwa', 'tokenization', 'tokenize', 'asset tokenization', 'real world',
+                'fractional ownership', 'fractionalize', 'security token', 'sto',
+                'alternative financing', 'asset-based lending', 'creative financing',
+                'revolving equity', 'asset owner', 'property tokenization'
+            ]
             has_rwa = any(
                 any(keyword in service.lower() for keyword in rwa_keywords)
                 for service in service_match

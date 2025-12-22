@@ -530,7 +530,7 @@
                         <label for="servicePreset">🎯 Service Type</label>
                         <select id="servicePreset" name="service_preset">
                             <option value="">-- Select Preset --</option>
-                            <optgroup label="🔴 Reddit Presets (Casual Language)">
+                            <optgroup label="🔴 Reddit Presets">
                                 <option value="competitor_frustration">Competitor Frustration</option>
                                 <option value="rwa">🌟 RWA Tokenization (Recommended)</option>
                                 <option value="crypto">Crypto/Web3 Development</option>
@@ -540,18 +540,18 @@
                                 <option value="smart_contracts">Smart Contract Development</option>
                                 <option value="ai">AI/ML Automation</option>
                             </optgroup>
-                            <optgroup label="💼 LinkedIn Presets (Professional B2B)">
-                                <option value="competitor_frustration_linkedin">Competitor Frustration (Corporate)</option>
-                                <option value="rwa_linkedin">🌟 RWA Tokenization (Institutional)</option>
-                                <option value="crypto_linkedin">Crypto/Web3 (Enterprise)</option>
-                                <option value="blockchain_linkedin">Blockchain (Enterprise)</option>
-                                <option value="web3_linkedin">Web3 (Corporate)</option>
-                                <option value="defi_linkedin">DeFi (Institutional)</option>
-                                <option value="smart_contracts_linkedin">Smart Contracts (Professional)</option>
+                            <optgroup label="💼 LinkedIn Presets">
+                                <option value="competitor_frustration_linkedin">Competitor Frustration</option>
+                                <option value="rwa_linkedin">🌟 RWA Tokenization</option>
+                                <option value="crypto_linkedin">Crypto/Web3 </option>
+                                <option value="blockchain_linkedin">Blockchain</option>
+                                <option value="web3_linkedin">Web3 </option>
+                                <option value="defi_linkedin">DeFi</option>
+                                <option value="smart_contracts_linkedin">Smart Contracts</option>
                                 <option value="ai_linkedin">AI/ML (Enterprise)</option>
                             </optgroup>
                         </select>
-                        <div class="help-text">Choose Reddit presets for casual platforms, LinkedIn presets for professional networks</div>
+                        <div class="help-text">Cross-platform presets - works with all sources</div>
                     </div>
 
                     <!-- Custom Keywords -->
@@ -658,7 +658,7 @@
                     <!-- Minimum Confidence -->
                     <div class="form-group" id="minConfidenceGroup" style="display: block;">
                         <label for="minConfidence">🎯 Minimum Confidence Score</label>
-                        <input type="number" id="minConfidence" name="min_confidence" value="0.65" min="0.5" max="1.0" step="0.05">
+                        <input type="number" id="minConfidence" name="min_confidence" value="0.60" min="0.5" max="1.0" step="0.05">
                         <div class="help-text">Only qualify leads with confidence ≥ this score (0.5 - 1.0)</div>
                     </div>
 
