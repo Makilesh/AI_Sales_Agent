@@ -616,6 +616,9 @@ async def run_linkedin_selenium2_scraper(keywords: list[str], settings: dict, jo
 
 async def run_scraping_job(job_id: str, sources: list, keywords: list, max_leads: int, qualify: bool, filter_service: str, min_confidence: float = 0.65, days_filter: int = 30, service_preset: str = None, selenium2_settings: dict = None):
     """Run scraping job in background."""
+    all_leads = []
+    output_file = f"data/leads_{job_id}.json"
+    
     try:
         # Update max leads, min confidence, and days filter (universal for all sources)
         settings.scraping.max_total_leads = max_leads
@@ -647,8 +650,7 @@ async def run_scraping_job(job_id: str, sources: list, keywords: list, max_leads
         scraping_jobs[job_id]['leads_found'] = len(all_leads)
         scraping_jobs[job_id]['progress'] = 50
         
-        # Save leads
-        output_file = f"data/leads_{job_id}.json"
+        # Save leads (create file even if empty)
         append_leads(all_leads, output_file)
         scraping_jobs[job_id]['output_file'] = output_file
         
@@ -699,6 +701,16 @@ async def run_scraping_job(job_id: str, sources: list, keywords: list, max_leads
         scraping_jobs[job_id]['completed_at'] = datetime.now().isoformat()
         
     except Exception as e:
+        # Still save whatever leads we collected before the error
+        if all_leads:
+            append_leads(all_leads, output_file)
+            scraping_jobs[job_id]['output_file'] = output_file
+            scraping_jobs[job_id]['leads_found'] = len(all_leads)
+        else:
+            # Create empty file so download doesn't fail
+            append_leads([], output_file)
+            scraping_jobs[job_id]['output_file'] = output_file
+            
         scraping_jobs[job_id]['status'] = 'failed'
         scraping_jobs[job_id]['error'] = str(e)
         print(f"Job {job_id} failed: {e}")
@@ -753,11 +765,23 @@ def download_file(job_id, file_type):
     job = scraping_jobs[job_id]
     
     if file_type == 'json' and 'output_file' in job:
-        return send_file(job['output_file'], as_attachment=True)
+        file_path = job['output_file']
+        if not os.path.exists(file_path):
+            return jsonify({'error': 'File not found on disk. Job may still be running or failed before creating output.'}), 404
+        return send_file(file_path, as_attachment=True)
     elif file_type == 'excel' and 'excel_file' in job:
-        return send_file(job['excel_file'], as_attachment=True)
+        file_path = job['excel_file']
+        if not os.path.exists(file_path):
+            return jsonify({'error': 'Excel file not found. Job may not have completed qualification.'}), 404
+        return send_file(file_path, as_attachment=True)
+    elif file_type == 'excel' and 'all_leads_excel' in job:
+        # Fallback to all_leads_excel if excel_file doesn't exist
+        file_path = job['all_leads_excel']
+        if not os.path.exists(file_path):
+            return jsonify({'error': 'Excel file not found on disk.'}), 404
+        return send_file(file_path, as_attachment=True)
     else:
-        return jsonify({'error': 'File not found'}), 404
+        return jsonify({'error': 'File type not available for this job'}), 404
 
 
 @app.route('/api/leads/<job_id>', methods=['GET'])
@@ -769,6 +793,10 @@ def get_leads(job_id):
     job = scraping_jobs[job_id]
     if 'output_file' not in job:
         return jsonify({'error': 'No leads file found'}), 404
+    
+    # Check if file exists
+    if not os.path.exists(job['output_file']):
+        return jsonify({'error': 'Leads file does not exist on disk'}), 404
     
     try:
         with open(job['output_file'], 'r', encoding='utf-8') as f:
@@ -817,6 +845,6 @@ if __name__ == '__main__':
     app.run(
         debug=True, 
         host='0.0.0.0', 
-        port=5000,
+        port=5002,
         use_reloader=False  # Disable auto-reload to prevent restarts
     )
