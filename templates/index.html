@@ -675,7 +675,6 @@
                     <button type="submit" class="btn btn-primary" id="startBtn">
                         🚀 Start Scraping
                     </button>
-                    
                 </form>
 
                 <!-- Progress -->
@@ -708,6 +707,7 @@
         // Load configuration on page load
         async function loadConfig() {
             try {
+                console.log('Loading configuration...');
                 const response = await fetch('/api/config');
                 const config = await response.json();
 
@@ -764,11 +764,10 @@
         // Load jobs list
         async function loadJobs() {
             try {
+                console.log('Loading jobs...');
                 const response = await fetch('/api/jobs');
                 const data = await response.json();
-                
-                console.log('📋 Loaded jobs:', data.jobs.length, 'jobs');
-                console.log('   Jobs:', data.jobs);
+                console.log('Jobs loaded:', data.jobs);
 
                 const jobsList = document.getElementById('jobsList');
                 
@@ -792,12 +791,13 @@
         // Create job card HTML
         function createJobCard(job) {
             const statusClass = `status-${job.status}`;
-            const showActions = job.status === 'completed' || job.status === 'failed';            const jobId = job.job_id;
-            
+            const showActions = job.status === 'completed' || job.status === 'failed';
+            const jobId = job.job_id;
+
             return `
                 <div class="job-card">
                     <div class="job-header">
-                        <div class="job-id">${job_id}</div>
+                        <div class="job-id">${jobId}</div>
                         <div class="job-status ${statusClass}">${job.status}</div>
                     </div>
                     <div class="job-info">
@@ -822,8 +822,14 @@
                         <div class="progress-bar">
                             <div class="progress-fill" style="width: ${job.progress}%">${job.progress}%</div>
                         </div>
+                        ${job.stop_requested ? `
+                            <div style="background: #fff3cd; padding: 10px; border-radius: 5px; margin-bottom: 10px; color: #856404; font-size: 13px;">
+                                ⏹️ <strong>Stop Requested</strong> - Finishing current operation...
+                            </div>
+                        ` : ''}
                         <div class="job-actions">
-                            <button class="btn-sm btn-stop" onclick="stopJob('` + jobId + `')" style="background: #dc3545; color: white;">                                ⏹️ Stop Job
+                            <button class="btn-sm btn-stop" onclick="stopJob('` + jobId + `')" ${job.stop_requested ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : 'style="background: #dc3545; color: white;"'}>
+                                ${job.stop_requested ? '⏳ Stopping...' : '⏹️ Stop Job'}
                             </button>
                         </div>
                     ` : ''}
@@ -958,12 +964,13 @@
                 currentJobId = result.job_id;
                 showAlert(`✅ Scraping job started: ${currentJobId}`, 'success');
 
-                // Show progress container and stop button
+                // Show progress container
                 document.getElementById('progressContainer').style.display = 'block';
-                // document.getElementById('stopBtn').style.display = 'block';
 
+                // Immediately reload jobs to show the new running job
                 loadJobs();
-                // Start checking status
+                
+                // Start checking status and reload jobs to show stop button
                 statusCheckInterval = setInterval(checkJobStatus, 2000);
 
             } catch (error) {
@@ -1011,10 +1018,9 @@
                     loadJobs();
                     loadStats();
 
-                    // Hide progress and stop button after 5 seconds
+                    // Hide progress after 5 seconds
                     setTimeout(() => {
                         document.getElementById('progressContainer').style.display = 'none';
-                        document.getElementById('stopBtn').style.display = 'none';
                     }, 5000);
                 }
 
@@ -1052,22 +1058,32 @@
                 return;
             }
             
+            console.log('Stopping job:', jobId);
+            
             try {
-                const response = await fetch(`/api/jobs/${JobId}/stop`, {
+                const response = await fetch(`/api/jobs/${jobId}/stop`, {
                     method: 'POST'
                 });
                 
+                console.log('Stop response status:', response.status);
                 const result = await response.json();
+                console.log('Stop response:', result);
                 
                 if (response.ok) {
-                    // showAlert('⏹️ Stopping scraping... Processing collected leads', 'info');
-                    showAlert('⏹️ Stopping job... Processing collected leads', 'info');
-                    // Reload jobs to update UI
-                    setTimeout(() => loadJobs(), 500);
+                    showAlert('⏹️ Stop requested! Job will finish current operation and process leads...', 'info');
+                    // Reload jobs immediately to show status change
+                    loadJobs();
+                    // Keep reloading to show progress
+                    const reloadInterval = setInterval(() => {
+                        loadJobs();
+                    }, 2000);
+                    // Stop reloading after 30 seconds
+                    setTimeout(() => clearInterval(reloadInterval), 30000);
                 } else {
                     showAlert('❌ Error: ' + result.error, 'error');
                 }
             } catch (error) {
+                console.error('Stop job error:', error);
                 showAlert('❌ Error stopping job: ' + error.message, 'error');
             }
         }

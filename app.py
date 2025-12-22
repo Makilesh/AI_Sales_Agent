@@ -741,13 +741,15 @@ def stop_job(job_id):
         return jsonify({'error': 'Job is not running'}), 400
     
     job['stop_requested'] = True
-    print(f"⏹️ Stop requested for job {job_id}")
+    print(f"\n{'='*60}")
+    print(f"⏹️  STOP REQUESTED FOR JOB: {job_id}")
+    print(f"{'='*60}\n")
     
     return jsonify({
         'message': 'Stop request received. Job will finish current operation and process collected leads.',
-        'status': 'stopping'
+        'status': 'stopping',
+        'stop_requested': True
     })
-
 
 @app.route('/api/jobs', methods=['GET'])
 def list_jobs():
