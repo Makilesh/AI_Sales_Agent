@@ -347,6 +347,15 @@
             background: #138496;
         }
 
+        .btn-stop {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-stop:hover {
+            background: #c82333;
+        }
+
         .lead-card {
             background: white;
             border: 1px solid #e0e0e0;
@@ -666,11 +675,7 @@
                     <button type="submit" class="btn btn-primary" id="startBtn">
                         🚀 Start Scraping
                     </button>
-                      
-                    <!-- Stop Button -->
-                    <button type="button" class="btn btn-secondary" id="stopBtn" onclick="stopScraping()" style="display: none;">
-                        ⏹️ Stop Scraping
-                    </button>
+                    
                 </form>
 
                 <!-- Progress -->
@@ -814,6 +819,11 @@
                         <div class="progress-bar">
                             <div class="progress-fill" style="width: ${job.progress}%">${job.progress}%</div>
                         </div>
+                        <div class="job-actions">
+                            <button class="btn-sm btn-stop" onclick="stopJob('${job.job_id}')" style="background: #dc3545; color: white;">
+                                ⏹️ Stop Job
+                            </button>
+                        </div>
                     ` : ''}
                     ${showActions ? `
                         <div class="job-actions">
@@ -948,10 +958,11 @@
 
                 // Show progress container and stop button
                 document.getElementById('progressContainer').style.display = 'block';
-                document.getElementById('stopBtn').style.display = 'block';
+                // document.getElementById('stopBtn').style.display = 'block';
 
                 // Start checking status
                 statusCheckInterval = setInterval(checkJobStatus, 2000);
+                loadJobs();
 
             } catch (error) {
                 showAlert('❌ Error: ' + error.message, 'error');
@@ -1033,25 +1044,24 @@
             }, 5000);
         }
 
-        // Stop scraping function
-        async function stopScraping() {
-            if (!currentJobId) return;
-            
-            if (!confirm('Stop scraping now and process collected leads?')) {
+        // Stop specific job function
+        async function stopJob(jobId) {
+            if (!confirm('Stop this job now and process collected leads?')) {
                 return;
             }
             
             try {
-                const response = await fetch(`/api/jobs/${currentJobId}/stop`, {
+                const response = await fetch(`/api/jobs/${JobId}/stop`, {
                     method: 'POST'
                 });
                 
                 const result = await response.json();
                 
                 if (response.ok) {
-                    showAlert('⏹️ Stopping scraping... Processing collected leads', 'info');
-                    document.getElementById('stopBtn').disabled = true;
-                    document.getElementById('stopBtn').textContent = '⏳ Stopping...';
+                    // showAlert('⏹️ Stopping scraping... Processing collected leads', 'info');
+                    showAlert('⏹️ Stopping job... Processing collected leads', 'info');
+                    // Reload jobs to update UI
+                    setTimeout(() => loadJobs(), 500);
                 } else {
                     showAlert('❌ Error: ' + result.error, 'error');
                 }
