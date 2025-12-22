@@ -61,12 +61,17 @@ def export_to_excel(
     ws = wb.active
     ws.title = "Qualified Leads"
     
-    # Define headers (IMPROVED: Added metadata columns for Reddit)
+    # Define headers (IMPROVED: Added metadata columns for Reddit + Contact Info)
     headers = [
         "Author",
+        "Reddit Profile",      # NEW: Direct profile link for easy access
         "Source",
         "Subreddit",           # NEW: Reddit subreddit name
         "Post Type",           # NEW: post/comment/submission
+        "User Karma",          # NEW: User's total karma (credibility indicator)
+        "Account Age (days)",  # NEW: Account age in days
+        "Account Created",     # NEW: Account creation date
+        "Verified",            # NEW: Email verified status
         "Content",
         "URL",
         "Engagement Score",
@@ -110,12 +115,19 @@ def export_to_excel(
         # Format timestamp
         timestamp_str = lead.timestamp.strftime("%Y-%m-%d %H:%M:%S")
         
-        # Prepare row data (IMPROVED: Added metadata columns)
+        # Prepare row data (IMPROVED: Added metadata columns + contact info)
+        reddit_profile_link = f"https://www.reddit.com/user/{lead.author}/" if lead.source == "reddit" and lead.author != "[deleted]" else "N/A"
+        
         row_data = [
             lead.author,
+            reddit_profile_link,                                        # NEW: Reddit profile link
             lead.source,
             lead.subreddit or "N/A",                                    # NEW: Subreddit
             lead.metadata.get('post_type', 'N/A'),                      # NEW: Post type
+            lead.metadata.get('user_karma', 'N/A'),                     # NEW: User karma
+            lead.metadata.get('account_age_days', 'N/A'),               # NEW: Account age
+            lead.metadata.get('account_created', 'N/A'),                # NEW: Account created date
+            "Yes" if lead.metadata.get('verified') else "No",          # NEW: Verified status
             content,
             lead.url,
             lead.engagement_score,
@@ -132,7 +144,7 @@ def export_to_excel(
         # Write row
         for col_idx, value in enumerate(row_data, 1):
             cell = ws.cell(row=row_idx, column=col_idx, value=value)
-            cell.alignment = Alignment(vertical="top", wrap_text=(col_idx in [5, 13]))  # Wrap text for Content (col 5) and Reason (col 13)
+            cell.alignment = Alignment(vertical="top", wrap_text=(col_idx in [10, 18]))  # Wrap text for Content (col 10) and Reason (col 18)
 
             # IMPROVED (ISSUE #3): Apply conditional formatting with search lead priority
             # Priority: Targeted Search (gold) > Qualified (green) > Not Qualified (red)
@@ -144,23 +156,28 @@ def export_to_excel(
             else:
                 cell.fill = not_qualified_fill
     
-    # Auto-adjust column widths (IMPROVED: Updated for new columns)
+    # Auto-adjust column widths (IMPROVED: Updated for new contact info columns)
     column_widths = {
         1: 20,   # Author
-        2: 12,   # Source
-        3: 18,   # Subreddit (NEW)
-        4: 12,   # Post Type (NEW)
-        5: 50,   # Content
-        6: 40,   # URL
-        7: 15,   # Engagement Score
-        8: 15,   # Targeted Search (NEW)
-        9: 30,   # Search Phrase (NEW)
-        10: 12,  # Is Qualified
-        11: 12,  # Confidence
-        12: 12,  # LLM Provider (NEW)
-        13: 50,  # Reason
-        14: 30,  # Service Match
-        15: 20   # Timestamp
+        2: 40,   # Reddit Profile (NEW)
+        3: 12,   # Source
+        4: 18,   # Subreddit
+        5: 12,   # Post Type
+        6: 12,   # User Karma (NEW)
+        7: 16,   # Account Age (NEW)
+        8: 15,   # Account Created (NEW)
+        9: 10,   # Verified (NEW)
+        10: 50,  # Content
+        11: 40,  # URL
+        12: 15,  # Engagement Score
+        13: 15,  # Targeted Search
+        14: 30,  # Search Phrase
+        15: 12,  # Is Qualified
+        16: 12,  # Confidence
+        17: 12,  # LLM Provider
+        18: 50,  # Reason
+        19: 30,  # Service Match
+        20: 20   # Timestamp
     }
     
     for col_idx, width in column_widths.items():

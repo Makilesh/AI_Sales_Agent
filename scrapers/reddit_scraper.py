@@ -183,6 +183,39 @@ class RedditScraper(BaseScraper):
         else:
             return 'all'
 
+    def _fetch_user_profile(self, username: str) -> dict:
+        """
+        Fetch additional user profile information for contact purposes.
+        
+        Args:
+            username: Reddit username
+            
+        Returns:
+            Dictionary with user profile data (karma, account age, verified status)
+        """
+        try:
+            user = self.reddit.redditor(username)
+            account_created = datetime.fromtimestamp(user.created_utc)
+            account_age_days = (datetime.now() - account_created).days
+            
+            return {
+                "user_karma": user.link_karma + user.comment_karma,
+                "account_age_days": account_age_days,
+                "account_created": account_created.strftime("%Y-%m-%d"),
+                "verified": user.verified,
+                "is_gold": user.is_gold,
+            }
+        except Exception as e:
+            if settings.debug_mode:
+                print(f"  ⚠️ Could not fetch profile for u/{username}: {e}")
+            return {
+                "user_karma": 0,
+                "account_age_days": 0,
+                "account_created": "Unknown",
+                "verified": False,
+                "is_gold": False,
+            }
+
     async def scrape(self) -> list[Lead]:
         """
         OPTIMIZED: Scrape posts from specified subreddits (subreddit-only strategy).
@@ -332,9 +365,13 @@ class RedditScraper(BaseScraper):
 
             content = f"{submission.title}\n\n{submission.selftext}" if submission.selftext else submission.title
 
+            # Fetch user profile for contact information
+            author_name = str(submission.author) if submission.author else '[deleted]'
+            user_profile = self._fetch_user_profile(author_name) if submission.author else {}
+
             return Lead(
                 source='reddit',
-                author=str(submission.author) if submission.author else '[deleted]',
+                author=author_name,
                 content=content,
                 timestamp=post_date,
                 url=f"https://reddit.com{submission.permalink}",
@@ -345,7 +382,13 @@ class RedditScraper(BaseScraper):
                     'post_id': submission.id,
                     'num_comments': submission.num_comments,
                     'post_type': 'submission',
-                    'is_self': submission.is_self
+                    'is_self': submission.is_self,
+                    # Contact information
+                    'user_karma': user_profile.get('user_karma', 0),
+                    'account_age_days': user_profile.get('account_age_days', 0),
+                    'account_created': user_profile.get('account_created', 'Unknown'),
+                    'verified': user_profile.get('verified', False),
+                    'is_gold': user_profile.get('is_gold', False),
                 }
             )
         except Exception as e:
