@@ -789,12 +789,13 @@
         // Create job card HTML
         function createJobCard(job) {
             const statusClass = `status-${job.status}`;
-            const showActions = job.status === 'completed' || job.status === 'failed';            const jobId = job.job_id;
+            const showActions = job.status === 'completed' || job.status === 'failed';
+            const jobId = job.job_id;
             
             return `
                 <div class="job-card">
                     <div class="job-header">
-                        <div class="job-id">${job_id}</div>
+                        <div class="job-id">${jobId}</div>
                         <div class="job-status ${statusClass}">${job.status}</div>
                     </div>
                     <div class="job-info">
