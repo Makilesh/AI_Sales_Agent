@@ -790,11 +790,12 @@
         function createJobCard(job) {
             const statusClass = `status-${job.status}`;
             const showActions = job.status === 'completed';
-
+            const jobId = job.job_id;
+            
             return `
                 <div class="job-card">
                     <div class="job-header">
-                        <div class="job-id">${job.job_id}</div>
+                        <div class="job-id">${job_id}</div>
                         <div class="job-status ${statusClass}">${job.status}</div>
                     </div>
                     <div class="job-info">
@@ -820,22 +821,21 @@
                             <div class="progress-fill" style="width: ${job.progress}%">${job.progress}%</div>
                         </div>
                         <div class="job-actions">
-                            <button class="btn-sm btn-stop" onclick="stopJob('${job.job_id}')" style="background: #dc3545; color: white;">
-                                ⏹️ Stop Job
+                            <button class="btn-sm btn-stop" onclick="stopJob('` + jobId + `')" style="background: #dc3545; color: white;">                                ⏹️ Stop Job
                             </button>
                         </div>
                     ` : ''}
                     ${showActions ? `
                         <div class="job-actions">
-                            <button class="btn-sm btn-download" onclick="downloadFile('${job.job_id}', 'json')">
+                            <button class="btn-sm btn-download" onclick="downloadFile('` + jobId + `', 'json')">
                                 📥 JSON
                             </button>
                             ${job.excel_file ? `
-                                <button class="btn-sm btn-download" onclick="downloadFile('${job.job_id}', 'excel')">
+                                <button class="btn-sm btn-download" onclick="downloadFile('` + jobId + `', 'excel')">
                                     📊 Excel
                                 </button>
                             ` : ''}
-                            <button class="btn-sm btn-view" onclick="viewLeads('${job.job_id}')">
+                            <button class="btn-sm btn-view" onclick="viewLeads('` + jobId + `')">
                                 👁️ View Leads
                             </button>
                         </div>

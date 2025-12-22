@@ -617,9 +617,13 @@ async def run_linkedin_selenium2_scraper(keywords: list[str], settings: dict, jo
 async def run_scraping_job(job_id: str, sources: list, keywords: list, max_leads: int, qualify: bool, filter_service: str, min_confidence: float = 0.65, days_filter: int = 30, service_preset: str = None, selenium2_settings: dict = None):
     """Run scraping job in background."""
     all_leads = []
-    output_file = f"data/leads_{job_id}.json"
+    # Use absolute path for output file
+    output_file = os.path.abspath(f"data/leads_{job_id}.json")
     
     try:
+        # Ensure data directory exists
+        os.makedirs('data', exist_ok=True)
+        
         # Update max leads, min confidence, and days filter (universal for all sources)
         settings.scraping.max_total_leads = max_leads
         settings.min_confidence_score = min_confidence  # Set confidence threshold
@@ -656,7 +660,7 @@ async def run_scraping_job(job_id: str, sources: list, keywords: list, max_leads
         
         # ALWAYS export all leads to Excel (even if empty)
         from storage.excel_handler import export_all_leads_to_excel
-        all_leads_excel = f"data/all_leads_{job_id}.xlsx"
+        all_leads_excel = os.path.abspath(f"data/all_leads_{job_id}.xlsx")
         export_all_leads_to_excel(all_leads, all_leads_excel)
         scraping_jobs[job_id]['all_leads_excel'] = all_leads_excel
         
@@ -685,7 +689,7 @@ async def run_scraping_job(job_id: str, sources: list, keywords: list, max_leads
             
             # Export to Excel
             if qualified_leads:
-                excel_file = f"data/qualified_leads_{job_id}.xlsx"
+                excel_file = os.path.abspath(f"data/qualified_leads_{job_id}.xlsx")
                 export_to_excel(
                     qualified_leads,
                     [qual for qual in qualifications if qual.get('is_qualified', False)],
