@@ -221,7 +221,7 @@ class ScrapingConfig:
 
         # 1. COMPETITOR FRUSTRATION (Reddit)
         'competitor_frustration': [
-            "alternative to Antier", "alternative to LeewayHertz",
+            "alternative to Antier", "alternative to LeewayHertz", 
             "alternative to Accubits", "alternative to SoluLab",
             "alternative tokenization", "disappointed with current",
             "need new consultant", "switch provider",

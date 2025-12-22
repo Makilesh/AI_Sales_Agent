@@ -266,15 +266,15 @@ JSON: {{"is_qualified": true/false, "confidence_score": 0.0-1.0, "reason": "[ACC
             return False, "spam/self-promotion (2+ indicators)"
 
         # BLOCK 2: Job postings (company hiring employees, NOT consultants/vendors)
-        # Exception: Allow if seeking consultant/vendor/agency
+        # Exception: Allow if seeking consultant/vendor/agency OR has RWA/service keywords
         hiring_indicators = [
-            "[hiring]", "we are hiring", "we're hiring", "apply now",
+             "apply now",
             "submit your resume", "send cv to", "years experience required",
             "remote work in the ai", "earn $", "weekly ai projects"
         ]
         
         if any(indicator in full_text for indicator in hiring_indicators):
-            # EXCEPTION: Check if hiring consultant/vendor (legitimate service request)
+            # EXCEPTION 1: Check if hiring consultant/vendor (legitimate service request)
             consultant_indicators = [
                 "hiring consultant", "hiring agency", "hiring vendor",
                 "hiring freelancer", "hiring contractor", "seeking consultant",
@@ -282,10 +282,19 @@ JSON: {{"is_qualified": true/false, "confidence_score": 0.0-1.0, "reason": "[ACC
                 "agency needed", "vendor needed", "freelancer needed"
             ]
             
-            # If hiring consultant/vendor, allow through (not employee hiring)
-            if any(consultant in full_text for consultant in consultant_indicators):
-                pass  # Allow - this is a service request
-            else:
+            # EXCEPTION 2: Check if has RWA/service keywords (might be B2B service request)
+            service_keywords = [
+                "tokenization", "tokenize", "rwa", "real world asset",
+                "fractional ownership", "security token", "asset-backed",
+                "blockchain consultant", "web3 consultant", "defi consultant",
+                "smart contract", "crypto integration"
+            ]
+            
+            # If hiring consultant/vendor OR has service keywords, allow through
+            has_consultant = any(consultant in full_text for consultant in consultant_indicators)
+            has_service_keywords = any(keyword in full_text for keyword in service_keywords)
+            
+            if not (has_consultant or has_service_keywords):
                 return False, "job posting (company hiring employees)"
         
         # BLOCK 3: Service providers offering services (not seeking)

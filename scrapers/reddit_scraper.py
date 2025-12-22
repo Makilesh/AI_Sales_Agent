@@ -119,9 +119,9 @@ class RedditScraper(BaseScraper):
         # BLOCK 2: Service providers (offering services, not seeking)
         # Block BEFORE inquiry check to prevent false positives
         offering_patterns = [
-            "[for hire]", "i offer", "my services include",
+            "i offer", "my services include",
             "i can help with", "i specialize in", "my expertise",
-            "portfolio:", "available for hire", "freelancer available"
+            "portfolio:"
         ]
         if any(pattern in full_text for pattern in offering_patterns):
             return False  # Service provider - hard block
@@ -134,7 +134,7 @@ class RedditScraper(BaseScraper):
             # Exploratory RWA language (researching solutions)
             "exploring tokenization", "considering tokenization", "researching tokenization",
             "exploring fractional", "considering fractional", "researching fractional",
-            # Need-based RWA (implicit inquiry)
+            # # Need-based RWA (implicit inquiry)
             "need tokenization", "need to tokenize", "want to tokenize",
             "need fractional", "need asset tokenization",
             # Platform/service seeking (RWA-specific)
@@ -152,7 +152,7 @@ class RedditScraper(BaseScraper):
         inquiry_signals = [
             "looking for", "need help", "need someone", "need a",
             "anyone recommend", "recommendations for",
-            "[hiring]", "[for hire]", "[task]", "hiring",
+            "[task]",  # Removed: "[hiring]", "[for hire]", "hiring" - handled by pre-LLM filter
             "budget", "willing to pay", "can pay",
             "struggling with", "help with", "stuck on",
             "seeking", "best tool", "best platform", "best service",
