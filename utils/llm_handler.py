@@ -104,7 +104,8 @@ class LLMLeadQualifier:
 - Asset tokenization platforms (art, commodities, securities)
 - Security Token Offerings (STO) infrastructure
 - Fractional ownership solutions
-- Regulatory-compliant tokenization
+- Alternative financing for asset owners
+- Asset-based lending solutions
 
 **RWA QUALIFICATION - ACCEPT if ANY of these patterns:**
 
@@ -113,14 +114,22 @@ class LLMLeadQualifier:
    - Asset + action: "tokenize my property", "fractionalize our real estate"
    - Platform seeking: "tokenization platform", "STO platform"
 
-2. **IMPLICIT TOKENIZATION INTENT** (confidence: 0.6-0.8)
+2. **ALTERNATIVE FINANCING SIGNALS** (confidence: 0.7-0.9) ⭐ NEW
+   - Asset owner + financing need: "own property" + "need financing/capital"
+   - Frustration with traditional banks: "can't get approved", "banks won't lend"
+   - Alternative solutions: "alternative financing", "creative financing", "non-traditional lending"
+   - Asset-based requests: "asset-based lending", "leverage my property", "use property as collateral"
+   - Equity structures: "revolving equity", "HELOC alternative", "equity line without debt"
+   - Capital constrained: "need capital for", "looking for funding but", "cash-poor asset-rich"
+
+3. **IMPLICIT TOKENIZATION INTENT** (confidence: 0.6-0.8)
    - Fractional ownership + real assets (property, art, securities)
    - "Digital securities" + real assets
    - "Blockchain for real estate" + investment/fractionalization context
    - "Asset-backed tokens" or "security tokens"
    - Mentions STO, Reg D, 506c offerings (regulatory terms)
 
-3. **EXPLORATORY/RESEARCH** (confidence: 0.5-0.7)
+4. **EXPLORATORY/RESEARCH** (confidence: 0.5-0.7)
    - "Exploring/considering/researching" + tokenization/fractional ownership
    - Questions about tokenization: "how to tokenize", "best way to tokenize"
    - Asset owner researching solutions: "options for fractionalizing my property"
@@ -134,9 +143,15 @@ class LLMLeadQualifier:
 - Job postings: [Hiring] employee positions
 - Service providers: [For Hire] developers offering services
 - News/discussion: "What do you think about tokenization?"
+- Seeking general advice without financing/capital needs
 
 **EDGE CASES - USE CONTEXT:**
 - "Hiring tokenization consultant" → ACCEPT (seeking vendor, not employee)
+- "Looking for financing options" + owns property → ACCEPT (alternative financing = tokenization opportunity)
+- "Asset-based underwriting" + real estate → ACCEPT (tokenization provides this)
+- "Revolving equity structure" + property → ACCEPT (fractional ownership solution)
+- "Need capital but can't get bank loan" + owns assets → ACCEPT (tokenization raises capital)
+- "Property owner needs renovation funds" → ACCEPT (can tokenize to raise capital)
 - "Blockchain solution for real estate fund" → ACCEPT if mentions fractionalization/investment
 - "Digital platform for property investment" → ACCEPT if implies fractional ownership"""
             rejection_rule = "\n**MANDATORY: If not about ASSET TOKENIZATION (explicit OR implicit), set is_qualified=false with reason='Not RWA - [topic]' and service_match=[]"
